@@ -425,24 +425,14 @@ function computeTotals(items,disc,st){
 }
 function seed(){
   const R=mulberry(20261004),now=Date.now();
-  const st={storeName:'Soan Kofe',tagline:'Instagram : @soankofe',address:'Jl. Taman Lebak Bulus Indah Blok X No.12A, Komp. Taman Lebak Lestari Residence',taxEnabled:true,taxRate:11,serviceEnabled:false,serviceRate:5,footer:'Pass: koncokoncosoan, #monggosoan.',prefix:'SK',pointsPer:10000,blockOut:true};
+  const st={storeName:'Soan Kofe',tagline:'Instagram : @soankofe',address:'Jl.Taman Lebak Bulus IV Blok X, No.12A, Komplek Lebak Lestari Indah Residence',taxEnabled:true,taxRate:11,serviceEnabled:false,serviceRate:5,footer:'Pass: koncokoncosoan, #monggosoan.',prefix:'SK',pointsPer:10000,blockOut:true};
   const users=[{id:'u-owner',name:'Owner',role:'owner',pin:'1234'},{id:'u-barista',name:'Muhammad Azwar',role:'cashier',pin:'0000'}];
-  const categories=[{id:'c-kopi',name:'Kopi'},{id:'c-non',name:'Non-Kopi'},{id:'c-mak',name:'Makanan'},{id:'c-biji',name:'Biji Kopi'},{id:'c-drip',name:'Filter Bag'}];
+  const categories=[{id:'c-coffee',name:'Classic'},{id:'c-non',name:'Non-Coffee'}];
   const P=(sku,name,cat,price,cost,track,stock,min)=>({id:'p-'+sku.toLowerCase(),sku,name,cat,price,cost,track,stock,min,active:true,mode:track?'stock':'none'});
   const products=[
-    P('KP-001','Espresso','c-kopi',18000,5500,false,0,0),P('KP-002','Americano','c-kopi',22000,6000,false,0,0),
-    P('KP-003','Cappuccino','c-kopi',28000,9000,false,0,0),P('KP-004','Cafe Latte','c-kopi',30000,10000,false,0,0),
-    P('KP-005','Kopi Susu Soan','c-kopi',26000,8500,false,0,0),P('KP-006','Es Kopi Aren','c-kopi',27000,9000,false,0,0),
-    P('KP-007','V60 Mandheling','c-kopi',35000,12000,false,0,0),P('KP-008','Affogato','c-kopi',34000,12500,false,0,0),
-    P('NK-001','Matcha Latte','c-non',32000,12000,false,0,0),P('NK-002','Cokelat Panas','c-non',28000,9500,false,0,0),
-    P('NK-003','Teh Tarik','c-non',22000,6000,false,0,0),P('NK-004','Lemon Tea','c-non',20000,5000,false,0,0),
-    P('MK-001','Croissant Butter','c-mak',24000,11000,true,18,5),P('MK-002','Roti Bakar Cokelat','c-mak',22000,8000,true,14,5),
-    P('MK-003','Pisang Goreng Keju','c-mak',20000,7500,true,10,4),P('MK-004','Banana Bread','c-mak',18000,7000,true,12,4),
-    P('BJ-001','Mandheling 250g','c-biji',95000,58000,true,24,6),P('BJ-002','Gayo 250g','c-biji',98000,60000,true,20,6),
-    P('BJ-003','Toraja Kalosi 250g','c-biji',105000,65000,true,4,6),P('BJ-004','Flores Bajawa 250g','c-biji',98000,60000,true,16,6),
-    P('FB-001','Filter Coffee Bags (10)','c-drip',65000,38000,true,30,8),P('FB-002','Filter Bags Gayo (5)','c-drip',35000,20000,true,3,6)
+    P('KP-001','Espresso','c-kopi',18000,5500,false,0,0)
   ];
-  const customers=[['Rina Kusuma','0812-1100-2201'],['Budi Santoso','0813-2200-3302'],['Maya Putri','0857-3300-4403'],['Andi Pratama','0821-4400-5504'],['Siska Lestari','0878-5500-6605'],['Bagas Wijaya','0896-6600-7706']]
+  const customers=[['Rina Kusuma','0812-1100-2201'],['Budi Santoso','0813-2200-3302']]
     .map((c,i)=>({id:'cu-'+i,name:c[0],phone:c[1],points:0,notes:'',created:addDays(now,-40-i*3)}));
   const ingredients=[],ingLog=[];demoIngredients(ingredients,ingLog,products,now);
   const kopiNon=products.filter(p=>p.cat==='c-kopi'||p.cat==='c-non'),mak=products.filter(p=>p.cat==='c-mak'),retail=products.filter(p=>p.cat==='c-biji'||p.cat==='c-drip');
@@ -574,7 +564,7 @@ function loginHTML(){
     const keys=['1','2','3','4','5','6','7','8','9','','0','del'].map(k=>k===''?'<span></span>':'<button data-act="pin" data-k="'+k+'" aria-label="'+(k==='del'?'Hapus':k)+'">'+(k==='del'?'⌫':k)+'</button>').join('');
     pin='<div class="lbl" style="text-align:center">Masukkan PIN '+esc(u.name)+'</div>'+dots+'<div class="err-msg">'+(L.err?'PIN salah, coba lagi':'')+'</div><div class="keypad">'+keys+'</div>';
   }
-  return '<div class="login"><div class="login-art"><svg class="big-ring" viewBox="0 0 100 100" aria-hidden="true" style="color:var(--side-fg);--mark-gap:var(--side)"><circle cx="50" cy="50" r="50" fill="currentColor"/><circle cx="50" cy="50" r="38" fill="var(--side)"/><circle cx="50" cy="50" r="29" fill="var(--amber)"/></svg><div class="txt">'+wordmark+'</div><div class="txt"><h2>Sistem kasir untuk kedai kopi.</h2><p style="color:var(--side-muted);max-width:36ch">Pesanan, pembayaran, stok, dan laporan harian dalam satu layar.</p></div></div>'
+  return '<div class="login"><div class="login-art"><svg class="big-ring" viewBox="0 0 100 100" aria-hidden="true" style="color:var(--side-fg);--mark-gap:var(--side)"><circle cx="50" cy="50" r="50" fill="currentColor"/><circle cx="50" cy="50" r="38" fill="var(--side)"/><circle cx="50" cy="50" r="29" fill="var(--amber)"/></svg><div class="txt">'+wordmark+'</div><div class="txt"><h2>#monggosoan.</h2><p style="color:var(--side-muted);max-width:36ch">Jl.Taman Lebak Bulus IV Blok X, No.12A, Komplek Lebak Lestari Indah Residence.</p></div></div>'
    +'<div class="login-form"><div><div class="lbl">Masuk</div><h1 style="font-size:28px;margin-top:6px">Login to Access</h1></div><div class="u-tiles">'+tiles+'</div>'+pin
    +'<p class="muted" style="font-size:12px">Akun contoh: Pemilik PIN 1234, Kasir 1 PIN 0000. Ubah di Pengaturan.</p></div></div>';
 }
