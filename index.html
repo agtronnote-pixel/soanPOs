@@ -351,7 +351,7 @@ const fmtDate=ts=>new Date(ts).toLocaleDateString('id-ID',{day:'2-digit',month:'
 const fmtTime=ts=>pad(new Date(ts).getHours())+':'+pad(new Date(ts).getMinutes());
 const fmtDT=ts=>fmtDate(ts)+', '+fmtTime(ts);
 const METHODS={cash:'Tunai',qris:'QRIS',debit:'Debit',transfer:'Transfer'};
-const TYPES={dine:'Dine in',take:'Bawa pulang',delivery:'Delivery'};
+const TYPES={dine:'Dine in',take:'Take away',delivery:'Delivery'};
 
 const ICONS={
 cart:'<circle cx="9" cy="20" r="1.4"/><circle cx="18" cy="20" r="1.4"/><path d="M3 4h2.5l2.2 11h10.6l2-8H6.4"/>',
@@ -387,35 +387,12 @@ const chip=(act,v,label,cur)=>'<button class="chip'+(v===cur?' on':'')+'" data-a
 const hasRecipe=p=>Array.isArray(p.recipe)&&p.recipe.length>0;
 const modeOf=p=>p.mode==='recipe'&&hasRecipe(p)?'recipe':(p.mode==='stock'||(!p.mode&&p.track))?'stock':'none';
 const recipeCost=(rec,list)=>Math.round(rec.reduce((a,r)=>{const g=list.find(x=>x.id===r.iid);return a+(g?g.cost*r.qty:0)},0));
-const UNITS=['g','ml','pcs'];
+const UNITS=['gr','ml','pcs'];
 const SEED_ING=[
  ['i-espresso','Biji Espresso Blend','g',4200,1000,150,'Soan Roastery'],
- ['i-mandheling','Biji Mandheling','g',2200,500,180,'Soan Roastery'],
- ['i-susu','Susu Full Cream','ml',9500,3000,18,'Toko Susu Segar'],
- ['i-oat','Susu Oat','ml',5000,1500,60,'Toko Susu Segar'],
- ['i-aren','Gula Aren Cair','ml',2600,600,30,'Pasar Induk'],
- ['i-gula','Gula Pasir','g',4800,1000,16,'Pasar Induk'],
- ['i-matcha','Bubuk Matcha','g',90,150,700,'Nihon Supply'],
- ['i-cokelat','Bubuk Cokelat','g',1400,400,120,'Pasar Induk'],
- ['i-teh','Teh Hitam','g',650,200,120,'Pasar Induk'],
- ['i-lemon','Lemon','pcs',8,12,3000,'Pasar Induk'],
- ['i-es','Es Batu','g',12000,3000,3,'Pabrik Es'],
- ['i-icecream','Es Krim Vanila','g',300,500,60,'Toko Susu Segar'],
- ['i-cup','Cup + Tutup','pcs',260,80,1200,'Kemasan Jaya']
 ];
 const DEMO_RECIPES={
  'KP-001':[['i-espresso',18],['i-cup',1]],
- 'KP-002':[['i-espresso',18],['i-cup',1]],
- 'KP-003':[['i-espresso',18],['i-susu',120],['i-cup',1]],
- 'KP-004':[['i-espresso',18],['i-susu',180],['i-cup',1]],
- 'KP-005':[['i-espresso',18],['i-susu',120],['i-aren',25],['i-es',100],['i-cup',1]],
- 'KP-006':[['i-espresso',18],['i-susu',100],['i-aren',30],['i-es',120],['i-cup',1]],
- 'KP-007':[['i-mandheling',15],['i-cup',1]],
- 'KP-008':[['i-espresso',18],['i-icecream',80],['i-cup',1]],
- 'NK-001':[['i-matcha',5],['i-susu',180],['i-gula',15],['i-cup',1]],
- 'NK-002':[['i-cokelat',25],['i-susu',200],['i-cup',1]],
- 'NK-003':[['i-teh',8],['i-susu',100],['i-gula',15],['i-cup',1]],
- 'NK-004':[['i-teh',6],['i-lemon',0.5],['i-gula',20],['i-es',100],['i-cup',1]]
 };
 function demoIngredients(list,log,products,now){
   SEED_ING.forEach(a=>{list.push({id:a[0],name:a[1],unit:a[2],stock:a[3],min:a[4],cost:a[5],supplier:a[6],active:true});log.push({id:uid(),ts:addDays(now,-14),iid:a[0],type:'restock',qty:a[3],note:'Stok awal',unitCost:a[5],userId:'u-owner'})});
@@ -448,8 +425,8 @@ function computeTotals(items,disc,st){
 }
 function seed(){
   const R=mulberry(20261004),now=Date.now();
-  const st={storeName:'Soan Kofe',tagline:'Coffee Roastery',address:'Jl. Kopi Nusantara No. 12, Jakarta Selatan',phone:'0812-3456-7890',taxEnabled:true,taxRate:11,serviceEnabled:false,serviceRate:5,footer:'Terima kasih sudah mendukung kopi lokal.',prefix:'SK',pointsPer:10000,blockOut:true};
-  const users=[{id:'u-owner',name:'Pemilik',role:'owner',pin:'1234'},{id:'u-kasir',name:'Kasir 1',role:'cashier',pin:'0000'}];
+  const st={storeName:'Soan Kofe',tagline:'Instagram : @soankofe',address:'Jl. Taman Lebak Bulus Indah Blok X No.12A, Komp. Taman Lebak Lestari Residence',taxEnabled:true,taxRate:11,serviceEnabled:false,serviceRate:5,footer:'Pass: koncokoncosoan, #monggosoan.',prefix:'SK',pointsPer:10000,blockOut:true};
+  const users=[{id:'u-owner',name:'Owner',role:'owner',pin:'1234'},{id:'u-barista',name:'Muhammad Azwar',role:'cashier',pin:'0000'}];
   const categories=[{id:'c-kopi',name:'Kopi'},{id:'c-non',name:'Non-Kopi'},{id:'c-mak',name:'Makanan'},{id:'c-biji',name:'Biji Kopi'},{id:'c-drip',name:'Filter Bag'}];
   const P=(sku,name,cat,price,cost,track,stock,min)=>({id:'p-'+sku.toLowerCase(),sku,name,cat,price,cost,track,stock,min,active:true,mode:track?'stock':'none'});
   const products=[
