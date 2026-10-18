@@ -598,7 +598,7 @@ function loginHTML(){
     pin='<div class="lbl" style="text-align:center">Masukkan PIN '+esc(u.name)+'</div>'+dots+'<div class="err-msg">'+(L.err?'PIN salah, coba lagi':'')+'</div><div class="keypad">'+keys+'</div>';
   }
   return '<div class="login"><div class="login-art"><svg class="big-ring" viewBox="0 0 100 100" aria-hidden="true" style="color:var(--side-fg);--mark-gap:var(--side)"><circle cx="50" cy="50" r="50" fill="currentColor"/><circle cx="50" cy="50" r="38" fill="var(--side)"/><circle cx="50" cy="50" r="29" fill="var(--amber)"/></svg><div class="txt">'+wordmark+'</div><div class="txt"><h2>Sistem kasir untuk kedai kopi.</h2><p style="color:var(--side-muted);max-width:36ch">Pesanan, pembayaran, stok, dan laporan harian dalam satu layar.</p></div></div>'
-   +'<div class="login-form"><div><div class="lbl">Masuk</div><h1 style="font-size:28px;margin-top:6px">Siapa yang bertugas?</h1></div><div class="u-tiles">'+tiles+'</div>'+pin
+   +'<div class="login-form"><div><div class="lbl">Masuk</div><h1 style="font-size:28px;margin-top:6px">Login to Access</h1></div><div class="u-tiles">'+tiles+'</div>'+pin
    +'<p class="muted" style="font-size:12px">Akun contoh: Pemilik PIN 1234, Kasir 1 PIN 0000. Ubah di Pengaturan.</p></div></div>';
 }
 
