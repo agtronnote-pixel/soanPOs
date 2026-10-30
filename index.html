@@ -430,20 +430,20 @@ function seed(){
   const categories=[{id:'c-coffee',name:'Classic'},{id:'c-non',name:'Non-Coffee'}];
   const P=(sku,name,cat,price,cost,track,stock,min)=>({id:'p-'+sku.toLowerCase(),sku,name,cat,price,cost,track,stock,min,active:true,mode:track?'stock':'none'});
   const products=[
-    P('KP-001','Espresso','c-kopi',18000,5500,false,0,0)
+    P('KP-001','Espresso','c-coffee',18000,5500,false,0,0)
   ];
   const customers=[['Rina Kusuma','0812-1100-2201'],['Budi Santoso','0813-2200-3302']]
     .map((c,i)=>({id:'cu-'+i,name:c[0],phone:c[1],points:0,notes:'',created:addDays(now,-40-i*3)}));
   const ingredients=[],ingLog=[];demoIngredients(ingredients,ingLog,products,now);
-  const kopiNon=products.filter(p=>p.cat==='c-kopi'||p.cat==='c-non'),mak=products.filter(p=>p.cat==='c-mak'),retail=products.filter(p=>p.cat==='c-biji'||p.cat==='c-drip');
-  const pick=a=>a[Math.floor(R()*a.length)];
+  const kopiNon=products.filter(p=>p.cat==='c-coffee'||p.cat==='c-kopi'||p.cat==='c-non'),mak=products.filter(p=>p.cat==='c-mak'),retail=products.filter(p=>p.cat==='c-biji'||p.cat==='c-drip');
+  const pick=a=>{if(!a.length)a=kopiNon.length?kopiNon:products;return a[Math.floor(R()*a.length)]};
   const hw=[3,5,4,3,2,4,5,3,3,4,5,5,3,2];
   const pickHour=()=>{const t=hw.reduce((a,b)=>a+b,0);let r=R()*t;for(let i=0;i<hw.length;i++){r-=hw[i];if(r<=0)return 8+i}return 9};
   const sales=[],shifts=[],stockLog=[];let seq=0;
   for(let d=13;d>=0;d--){
     const day=addDays(sod(now),-d),dow=new Date(day).getDay();
     const shiftId='s-'+d,openCash=500000;
-    const sh={id:shiftId,userId:d%2?'u-kasir':'u-owner',openTs:d===0?Math.min(day+7*36e5,now-60000):day+7*36e5,openCash,closeTs:null,closeCash:null,expectedCash:null,diff:null,note:'',moves:[]};
+    const sh={id:shiftId,userId:d%2?'u-barista':'u-owner',openTs:d===0?Math.min(day+7*36e5,now-60000):day+7*36e5,openCash,closeTs:null,closeCash:null,expectedCash:null,diff:null,note:'',moves:[]};
     if(d%3===1)sh.moves.push({ts:day+11*36e5,type:'out',amount:50000,note:'Beli es batu'});
     let count=16+((dow===0||dow===6)?10:0)+Math.floor(R()*8);
     const list=[];
