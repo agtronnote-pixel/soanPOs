@@ -368,7 +368,7 @@ const METHODS={cash:'Tunai',qris:'QRIS',debit:'Debit',transfer:'Transfer'};
 const TYPES={dine:'Dine in',take:'Take away',delivery:'Delivery'};
 /* Tampilan yang bisa diatur dari Panel Developer (soan-config.json). Nilai bawaan = tampilan asli. */
 const PREVIEW=/[?&]preview=1(&|$)/.test(location.search);
-const UI={types:['dine','take','delivery'],methods:['cash','qris','debit','transfer'],reports:['trend','top','cats','gp','use','hours','pay'],hashtag:'#monggosoan.',loginTitle:'Login to Access'};
+const UI={types:['dine','take','delivery'],methods:['cash','qris','debit','transfer'],reports:['trend','top','cats','gp','use','hours','pay'],hashtag:'#monggosoan.',loginTitle:'Login to Access',salesRange:'today',reportRange:'7d',mtabs:['sum','menu','ing','log']};
 
 const ICONS={
 folder:'<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.6l2 2h7.4A2.5 2.5 0 0 1 21 9.5v7a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5z"/>',
@@ -639,6 +639,7 @@ function buildNav(list){
   VIEW_IDS.forEach(id=>{if(!seen.has(id))tree.push({kind:'view',id})});
   return {tree,pages};
 }
+let mtFirst=null;
 function applyConfig(c){
   NAV.length=0;NAV0.forEach(n=>NAV.push(Object.assign({},n,{roles:n.roles.slice()})));
   PAGE_IDS.forEach(id=>delete VIEWS[id]);PAGE_IDS=[];NAVTREE=NAV.map(n=>({kind:'view',id:n.id}));
@@ -656,6 +657,9 @@ function applyConfig(c){
     UI.methods=pickList(k.metodeBayar,Object.keys(METHODS0),METHODS)||UI.methods;
     const ukuran={kecil:128,normal:158,besar:200}[k.ukuranKartu];if(ukuran)css+=':root{--card-min:'+ukuran+'px}';
     UI.reports=pickList(c.laporan,UI0.reports,null)||UI.reports;
+    if(['today','7d','14d','month'].includes(c.laporanRentang))UI.reportRange=c.laporanRentang;
+    if(c.transaksi&&['today','yesterday','7d','all'].includes(c.transaksi.filterAwal))UI.salesRange=c.transaksi.filterAwal;
+    UI.mtabs=pickList(c.menuBahan&&c.menuBahan.tab,UI0.mtabs,null)||UI.mtabs;
     const t=c.teks||{};UI.hashtag=txtOk(t.hashtag,40)||UI.hashtag;UI.loginTitle=txtOk(t.judulLogin,40)||UI.loginTitle;
     const tm=c.tema||{};
     if(hexOk(tm.aksen))css+=':root:not([data-theme="dark"]){--amber:'+tm.aksen+';--amber-soft:'+mixHex(tm.aksen,'#ffffff',.78)+';--on-amber:'+(lum(tm.aksen)<.4?'#ffffff':'#151412')+'}';
@@ -666,6 +670,7 @@ function applyConfig(c){
   let st=document.getElementById('cfg-css');if(!st){st=document.createElement('style');st.id='cfg-css';document.head.appendChild(st)}
   st.textContent=css;
   if(!UI.types.includes(S.pos.type))S.pos.type=UI.types[0];
+  S.sf.range=UI.salesRange;S.rr=UI.reportRange;if(!UI.mtabs.includes(S.mt)||UI.mtabs[0]!==mtFirst)S.mt=UI.mtabs[0];mtFirst=UI.mtabs[0];
   if(S.user&&!canView(S.view))S.view='pos';
 }
 function loadConfig(){
@@ -1355,7 +1360,8 @@ function logTabHTML(){
   return '<div class="card flush"><div class="tablewrap"><table style="min-width:720px"><thead><tr><th>Waktu</th><th>Item</th><th>Jenis</th><th class="r">Jumlah</th><th>Catatan</th><th>Oleh</th></tr></thead><tbody>'+body+'</tbody></table></div></div>'+(rows.length>100?'<p class="muted">Menampilkan 100 mutasi terbaru.</p>':'');
 }
 VIEWS.menu=function(){
-  const tabs=[['sum','Ringkasan'],['menu','Menu ('+db.products.length+')'],['ing','Bahan baku ('+db.ingredients.length+')'],['log','Mutasi stok']];
+  const T0={sum:'Ringkasan',menu:'Menu ('+db.products.length+')',ing:'Bahan baku ('+db.ingredients.length+')',log:'Mutasi stok'};
+  const tabs=UI.mtabs.map(k=>[k,T0[k]]);if(!UI.mtabs.includes(S.mt))S.mt=UI.mtabs[0];
   const body={sum:menuSumHTML,menu:menuTabHTML,ing:ingTabHTML,log:logTabHTML}[S.mt]||menuSumHTML;
   return '<div class="chips">'+tabs.map(t=>chip('mt',t[0],t[1],S.mt)).join('')+'</div>'+body();
 };
