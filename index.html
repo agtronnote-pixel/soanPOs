@@ -93,7 +93,7 @@ body.dev-on{padding-right:400px}body.dev-on .pos.pop .cart{right:416px}
 .dv-adds{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .dv-sw{display:flex;gap:10px;align-items:flex-start;cursor:pointer;padding:4px 0}.dv-sw input{width:18px;height:18px;margin-top:2px;accent-color:var(--amber)}.dv-sw b{display:block;font-size:13px;font-weight:600}.dv-sw small{display:block;font-size:11.5px;color:var(--muted)}
 .dv-li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:center}.dv-li input[type=checkbox]{width:18px;height:18px;accent-color:var(--amber)}.dv-li .in{min-height:34px;padding:6px 9px;font-size:13px}
-.dv-seg{width:100%}.dv-reset{padding:14px 2px 0}
+.dv-seg{width:100%}.dv-li3{grid-template-columns:auto minmax(0,1fr) auto}.dv-reset{padding:14px 2px 0}
 .dv-foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}.dv-foot .btn:disabled{opacity:.45}
 @media (max-width:999px){body.dev-on{padding-right:0}#devbar{width:auto;left:0;top:auto;height:62dvh;border-left:0;border-top:1px solid var(--line);border-radius:18px 18px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.2)}body.dev-on .content{padding-bottom:calc(62dvh + 16px)}}
 .ak-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}.ak-grid .chk{font-weight:500}@media (max-width:420px){.ak-grid{grid-template-columns:1fr}}
@@ -428,7 +428,7 @@ const METHODS={cash:'Tunai',qris:'QRIS',debit:'Debit',transfer:'Transfer'};
 const TYPES={dine:'Dine in',take:'Take away',delivery:'Delivery'};
 /* Tampilan yang bisa diatur dari Panel Developer (soan-config.json). Nilai bawaan = tampilan asli. */
 const PREVIEW=/[?&]preview=1(&|$)/.test(location.search);
-const UI={types:['dine','take','delivery'],methods:['cash','qris','debit','transfer'],reports:['trend','top','cats','gp','use','hours','pay'],hashtag:'#monggosoan.',loginTitle:'Login to Access',salesRange:'today',reportRange:'7d',cartMode:'popup',mtabs:['sum','menu','ing','log']};
+const UI={types:['dine','take','delivery'],methods:['cash','qris','debit','transfer'],reports:['trend','top','cats','gp','use','hours','pay'],hashtag:'#monggosoan.',loginTitle:'Login to Access',salesRange:'today',reportRange:'7d',cartMode:'popup',mtabs:['sum','menu','ing','log'],mtl:{}};
 
 const ICONS={
 wallet:'<path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="3" y="8" width="18" height="11" rx="2.5"/><path d="M16 13.5h2"/>',
@@ -739,7 +739,7 @@ function applyConfig(c){
     UI.reports=pickList(c.laporan,UI0.reports,null)||UI.reports;
     if(['today','7d','14d','month'].includes(c.laporanRentang))UI.reportRange=c.laporanRentang;
     if(c.transaksi&&['today','yesterday','7d','all'].includes(c.transaksi.filterAwal))UI.salesRange=c.transaksi.filterAwal;
-    UI.mtabs=pickList(c.menuBahan&&c.menuBahan.tab,UI0.mtabs,null)||UI.mtabs;
+    UI.mtabs=pickList(c.menuBahan&&c.menuBahan.tab,UI0.mtabs,UI.mtl)||UI.mtabs;
     const t=c.teks||{};UI.hashtag=txtOk(t.hashtag,40)||UI.hashtag;UI.loginTitle=txtOk(t.judulLogin,40)||UI.loginTitle;
     const tm=c.tema||{};
     if(hexOk(tm.aksen))css+=':root:not([data-theme="dark"]){--amber:'+tm.aksen+';--amber-soft:'+mixHex(tm.aksen,'#ffffff',.78)+';--on-amber:'+(lum(tm.aksen)<.4?'#ffffff':'#151412')+'}';
@@ -758,7 +758,8 @@ let CFG_BASE=null;
 function cfgMerge(base,ov){
   const b=base&&typeof base==='object'?JSON.parse(JSON.stringify(base)):{};if(!ov||typeof ov!=='object')return b;
   ['menu','laporan'].forEach(k=>{if(Array.isArray(ov[k]))b[k]=JSON.parse(JSON.stringify(ov[k]))});
-  ['kasir','teks','tema'].forEach(k=>{if(ov[k]&&typeof ov[k]==='object')b[k]=Object.assign({},b[k]||{},JSON.parse(JSON.stringify(ov[k])))});
+  ['kasir','teks','tema','menuBahan','transaksi'].forEach(k=>{if(ov[k]&&typeof ov[k]==='object')b[k]=Object.assign({},b[k]||{},JSON.parse(JSON.stringify(ov[k])))});
+  if(typeof ov.laporanRentang==='string')b.laporanRentang=ov.laporanRentang;
   return b;
 }
 const uiOv=()=>S.dev?S.dev.draft:(db&&db.settings&&db.settings.ui)||null;
@@ -2064,7 +2065,7 @@ ACT['inv-save']=()=>{
   S.inv.cnt={};save();render();setTimeout(waTick,1200);toast(n+' item dicek'+(c?', '+c+' disesuaikan':', semua cocok'));
 };
 VIEWS.menu=function(){
-  const T0={sum:'Ringkasan',menu:'Menu ('+db.products.length+')',ing:'Bahan baku ('+db.ingredients.length+')',log:'Mutasi stok'};
+  const L=(k,d)=>UI.mtl[k]||d,T0={sum:L('sum','Ringkasan'),menu:L('menu','Menu')+' ('+db.products.length+')',ing:L('ing','Bahan baku')+' ('+db.ingredients.length+')',log:L('log','Mutasi stok')};
   const tabs=UI.mtabs.map(k=>[k,T0[k]]);if(!UI.mtabs.includes(S.mt))S.mt=UI.mtabs[0];
   const body={sum:menuSumHTML,menu:menuTabHTML,ing:ingTabHTML,log:logTabHTML}[S.mt]||menuSumHTML;
   return '<div class="chips">'+tabs.map(t=>chip('mt',t[0],t[1],S.mt)).join('')+'</div>'+body();
@@ -2770,6 +2771,9 @@ function devStart(){
   d.teks=Object.assign({hashtag:UI0.hashtag,judulLogin:UI0.loginTitle},eff.teks||{});
   d.tema=Object.assign({},eff.tema||{});
   d.fitur=Object.assign({},(db.settings.ui&&db.settings.ui.fitur)||{});
+  const mt=(eff.menuBahan&&Array.isArray(eff.menuBahan.tab))?eff.menuBahan.tab.filter(x=>x&&UI0.mtabs.includes(x.id)):[];
+  d.menuBahan={tab:mt.map(x=>({id:x.id,label:x.label||'',tampil:x.tampil!==false})).concat(UI0.mtabs.filter(id=>!mt.some(x=>x.id===id)).map(id=>({id,label:'',tampil:true})))};
+  d.transaksi={filterAwal:(eff.transaksi&&eff.transaksi.filterAwal)||UI0.salesRange};d.laporanRentang=eff.laporanRentang||UI0.reportRange;
   S.dev={draft:d,saved:JSON.stringify(d),open:{nav:true},sel:null};
   document.body.classList.add('dev-on');cfgApply();render();devRender();
 }
@@ -2803,11 +2807,16 @@ function devRender(){
   const fit=FITUR.map(f=>sw('fitur',f[0],d.fitur[f[0]]!==false,f[1],f[2])).join('')+'<p class="dv-help">Halaman seperti Keuangan, Inventory, atau Laporan diatur dari bagian Navigasi (●/◌).</p>';
   const kas='<div class="lbl">Panel pesanan</div>'+seg('cart',d.kasir.keranjang,[['popup','Popup'],['samping','Samping']])+'<div class="lbl" style="margin-top:10px">Ukuran kartu menu</div>'+seg('card',d.kasir.ukuranKartu,[['kecil','Kecil'],['normal','Normal'],['besar','Besar']])
     +'<div class="lbl" style="margin-top:10px">Tipe pesanan</div>'+lst('tp',d.kasir.tipePesanan)+'<div class="lbl" style="margin-top:10px">Metode bayar</div>'+lst('mb',d.kasir.metodeBayar);
+  const MTN={sum:'Ringkasan',menu:'Menu',ing:'Bahan baku',log:'Mutasi stok'},mtl=d.menuBahan.tab;
+  const sub='<div class="lbl">Menu & Bahan · tab / sub menu</div><p class="dv-help">Tab paling atas terbuka pertama. Kosongkan nama untuk memakai nama bawaan.</p>'
+    +mtl.map((x,i)=>'<div class="dv-li dv-li3"><input type="checkbox" data-dvc="mt-on" data-id="'+x.id+'"'+(x.tampil!==false?' checked':'')+' aria-label="Tampilkan tab '+MTN[x.id]+'"><input class="in" data-dvc="mt-lbl" data-id="'+x.id+'" value="'+esc(x.label||'')+'" placeholder="'+MTN[x.id]+'" maxlength="24"><span class="dv-acts"><button class="dv-ib" data-dv="mt-up" data-id="'+x.id+'" aria-label="Naik"'+(i===0?' disabled':'')+'>↑</button><button class="dv-ib" data-dv="mt-down" data-id="'+x.id+'" aria-label="Turun"'+(i===mtl.length-1?' disabled':'')+'>↓</button></span></div>').join('')
+    +'<div class="lbl" style="margin-top:10px">Transaksi · filter yang terbuka pertama</div>'+seg('sf',d.transaksi.filterAwal,[['today','Hari ini'],['yesterday','Kemarin'],['7d','7 hari'],['all','Semua']])
+    +'<div class="lbl" style="margin-top:10px">Laporan · rentang bawaan</div>'+seg('rr',d.laporanRentang,[['today','Hari ini'],['7d','7 hari'],['14d','14 hari'],['month','Bulan ini']]);
   const tam='<div class="fld"><label class="lbl" for="dv-aksen">Warna aksen</label><div style="display:flex;gap:8px;align-items:center"><input type="color" id="dv-aksen" data-dvc="aksen" value="'+(hexOk(d.tema.aksen)?d.tema.aksen:'#F2A31B')+'"><button class="btn sm ghost" data-dv="aksen-reset">Bawaan</button></div></div>'
     +'<div class="fld"><label class="lbl" for="dv-judul">Judul halaman login</label><input class="in" id="dv-judul" data-dvc="judul" value="'+esc(d.teks.judulLogin||'')+'" maxlength="40"></div><div class="fld"><label class="lbl" for="dv-tag">Hashtag login</label><input class="in" id="dv-tag" data-dvc="tag" value="'+esc(d.teks.hashtag||'')+'" maxlength="40"></div>'
     +'<div class="lbl">Kartu di halaman Laporan</div>'+d.laporan.map(x=>sw('lap',x.id,x.tampil!==false,RLBL[x.id]||x.id)).join('');
   el.innerHTML='<div class="dv-head"><div><b>Bilah Developer</b><span>'+(dirty?'Ada perubahan belum disimpan':'Tersimpan · berlaku di semua perangkat')+'</span></div><button class="icon-btn" data-dv="close" aria-label="Tutup bilah">✕</button></div>'
-    +'<div class="dv-body">'+devSec('nav','Navigasi & sub menu',nav)+devSec('fit','Fitur',fit)+devSec('kas','Halaman Kasir',kas)+devSec('tam','Tampilan & laporan',tam)
+    +'<div class="dv-body">'+devSec('nav','Navigasi & sub menu',nav)+devSec('fit','Fitur',fit)+devSec('sub','Sub menu halaman',sub)+devSec('kas','Halaman Kasir',kas)+devSec('tam','Tampilan & laporan',tam)
     +'<div class="dv-reset"><button class="btn sm ghost" data-dv="reset">Kembalikan ke pengaturan dasar</button></div></div>'
     +'<div class="dv-foot"><button class="btn ghost" data-dv="cancel"'+(dirty?'':' disabled')+'>Batalkan</button><button class="btn primary" data-dv="save"'+(dirty?'':' disabled')+'>Simpan & sebarkan</button></div>';
 }
@@ -2832,6 +2841,9 @@ function devClick(el){
   if(a==='cart'){d.kasir.keranjang=id;devLive();return}
   if(a==='card'){d.kasir.ukuranKartu=id;devLive();return}
   if(a==='aksen-reset'){delete d.tema.aksen;devLive();return}
+  if(a==='mt-up'||a==='mt-down'){const L=d.menuBahan.tab,i=L.findIndex(x=>x.id===id),j=a==='mt-up'?i-1:i+1;if(i<0||j<0||j>=L.length)return;const [x]=L.splice(i,1);L.splice(j,0,x);devLive();return}
+  if(a==='sf'){d.transaksi.filterAwal=id;devLive();return}
+  if(a==='rr'){d.laporanRentang=id;devLive();return}
   const f=devFind(id);if(!f)return;
   if(['up','down','in','out'].includes(a)){devMove(id,a);devLive();return}
   if(a==='hide'){if(devLocked(id))return;f.x.tampil=f.x.tampil===false;devLive();return}
@@ -2845,6 +2857,8 @@ function devChange(el){
   else if(a==='fitur')d.fitur[id]=el.checked;
   else if(a==='lap'){const x=d.laporan.find(y=>y.id===id);if(x)x.tampil=el.checked}
   else if(/^(tp|mb)-(on|lbl)$/.test(a)){const L=a.startsWith('tp')?d.kasir.tipePesanan:d.kasir.metodeBayar,x=L.find(y=>y.id===id);if(!x)return;if(a.endsWith('on')){if(!el.checked&&L.filter(y=>y.tampil!==false).length<2){el.checked=true;toast('Minimal satu harus tampil');return}x.tampil=el.checked}else x.label=el.value.trim()||x.label}
+  else if(a==='mt-on'){const L=d.menuBahan.tab,x=L.find(y=>y.id===id);if(!el.checked&&L.filter(y=>y.tampil!==false).length<2){el.checked=true;toast('Minimal satu tab harus tampil');return}x.tampil=el.checked}
+  else if(a==='mt-lbl'){const x=d.menuBahan.tab.find(y=>y.id===id);x.label=el.value.trim().slice(0,24)}
   else if(a==='aksen')d.tema.aksen=el.value;
   else if(a==='judul')d.teks.judulLogin=el.value.trim();
   else if(a==='tag')d.teks.hashtag=el.value.trim();
