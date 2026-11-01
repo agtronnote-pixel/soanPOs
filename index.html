@@ -176,6 +176,18 @@ a.nav-i,a.tab{text-decoration:none}
 .link{border:0;background:none;padding:0;color:var(--ink);font:600 12.5px var(--font-body);text-decoration:underline;text-underline-offset:3px;cursor:pointer}
 .cart-foot{display:grid;grid-template-columns:auto 1fr;gap:10px}
 .cart-fab{display:none}
+.cart-bg{display:none}
+.fab-go{margin-left:10px;font-weight:800}
+@media (min-width:1000px){
+  .pos.pop{display:block}
+  .pos.pop .cart{position:fixed;top:16px;right:16px;bottom:16px;width:min(430px,calc(100vw - 32px));max-height:none;z-index:60;transform:translateX(calc(100% + 48px));visibility:hidden;transition:transform .25s,visibility 0s .25s;overflow:auto}
+  .pos.pop .cart.open{transform:none;visibility:visible;box-shadow:-18px 0 50px rgba(0,0,0,.22);transition:transform .25s}
+  .pos.pop .cart .only-m{display:inline-grid}
+  .pos.pop~.cart-bg.on{display:block;position:fixed;inset:0;z-index:55;background:rgba(10,9,8,.35)}
+  .cart-fab.pop{display:flex;position:fixed;right:24px;bottom:24px;z-index:35;align-items:center;justify-content:space-between;gap:14px;min-height:54px;min-width:340px;padding:0 22px;border-radius:999px;border:0;background:var(--amber);color:var(--on-amber);font:700 14px var(--font-body);cursor:pointer;box-shadow:0 10px 28px rgba(0,0,0,.25)}
+  .cart-fab.pop[hidden]{display:none}
+}
+@media (max-width:999px){.cart-bg{display:none!important}}
 .empty{display:flex;flex-direction:column;align-items:center;text-align:center;gap:8px;padding:36px 16px;color:var(--muted)}
 .empty h3{color:var(--ink);font-size:17px}
 .empty .mark{width:54px;height:54px;opacity:.9}
@@ -374,7 +386,7 @@ const METHODS={cash:'Tunai',qris:'QRIS',debit:'Debit',transfer:'Transfer'};
 const TYPES={dine:'Dine in',take:'Take away',delivery:'Delivery'};
 /* Tampilan yang bisa diatur dari Panel Developer (soan-config.json). Nilai bawaan = tampilan asli. */
 const PREVIEW=/[?&]preview=1(&|$)/.test(location.search);
-const UI={types:['dine','take','delivery'],methods:['cash','qris','debit','transfer'],reports:['trend','top','cats','gp','use','hours','pay'],hashtag:'#monggosoan.',loginTitle:'Login to Access',salesRange:'today',reportRange:'7d',mtabs:['sum','menu','ing','log']};
+const UI={types:['dine','take','delivery'],methods:['cash','qris','debit','transfer'],reports:['trend','top','cats','gp','use','hours','pay'],hashtag:'#monggosoan.',loginTitle:'Login to Access',salesRange:'today',reportRange:'7d',cartMode:'popup',mtabs:['sum','menu','ing','log']};
 
 const ICONS={
 wallet:'<path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="3" y="8" width="18" height="11" rx="2.5"/><path d="M16 13.5h2"/>',
@@ -666,6 +678,7 @@ function applyConfig(c){
     const k=c.kasir||{};
     UI.types=pickList(k.tipePesanan,Object.keys(TYPES0),TYPES)||UI.types;
     UI.methods=pickList(k.metodeBayar,Object.keys(METHODS0),METHODS)||UI.methods;
+    if(k.keranjang==='popup'||k.keranjang==='samping')UI.cartMode=k.keranjang;
     const ukuran={kecil:128,normal:158,besar:200}[k.ukuranKartu];if(ukuran)css+=':root{--card-min:'+ukuran+'px}';
     UI.reports=pickList(c.laporan,UI0.reports,null)||UI.reports;
     if(['today','7d','14d','month'].includes(c.laporanRentang))UI.reportRange=c.laporanRentang;
@@ -808,12 +821,14 @@ function cartHTML(){
    +'<div class="sumr tot"><span>Total</span><span>'+rp(T.total)+'</span></div></div>'
    +'<div class="cart-foot"><button class="btn" data-act="hold"'+(n?'':' disabled')+'>Simpan</button><button class="btn primary" data-act="pay"'+(n?'':' disabled')+'>Bayar '+(n?rp(T.total):'')+'</button></div>';
 }
-function fabHTML(){return '<span>'+ico('cart')+' Pesanan · '+cartCount()+' item</span><span>'+rp(totals().total)+'</span>'}
+function fabHTML(){return '<span>'+ico('cart')+' Pesanan · '+cartCount()+' item</span><span>'+rp(totals().total)+' <b class="fab-go">Lanjut →</b></span>'}
 function updatePOS(){
   if(S.view!=='pos'||!$('#grid'))return;
   $('#grid').innerHTML=gridHTML();
   const c=$('#cart');c.innerHTML=cartHTML();c.classList.toggle('open',S.pos.cartOpen);
   const f=$('#fab');f.hidden=!cartCount();f.innerHTML=fabHTML();
+  const bg=$('#cart-bg');if(bg)bg.classList.toggle('on',S.pos.cartOpen);
+  if(!cartCount()&&S.pos.cartOpen&&UI.cartMode==='popup'&&innerWidth>=1000){S.pos.cartOpen=false;c.classList.remove('open');if(bg)bg.classList.remove('on')}
 }
 function openShiftCard(){
   const last=db.shifts.filter(s=>s.closeTs).sort((a,b)=>b.closeTs-a.closeTs)[0];
@@ -823,7 +838,7 @@ function openShiftCard(){
 VIEWS.pos=function(){
   if(!curShift())return openShiftCard();
   const cats=[{id:'all',name:'Semua'}].concat(db.categories);
-  return '<div class="pos"><section class="pos-main"><div class="toolbar"><div class="chips">'+cats.map(c=>chip('pcat',c.id,c.name,S.pos.cat)).join('')+'</div><input class="in search" id="pq" data-in="posq" placeholder="Cari menu atau SKU" value="'+esc(S.pos.q)+'" aria-label="Cari menu" style="width:240px;max-width:100%"></div><div class="grid" id="grid">'+gridHTML()+'</div></section><aside class="cart'+(S.pos.cartOpen?' open':'')+'" id="cart">'+cartHTML()+'</aside></div><button class="cart-fab" id="fab" data-act="cart-toggle"'+(cartCount()?'':' hidden')+'>'+fabHTML()+'</button>';
+  return '<div class="pos'+(UI.cartMode==='popup'?' pop':'')+'"><section class="pos-main"><div class="toolbar"><div class="chips">'+cats.map(c=>chip('pcat',c.id,c.name,S.pos.cat)).join('')+'</div><input class="in search" id="pq" data-in="posq" placeholder="Cari menu atau SKU" value="'+esc(S.pos.q)+'" aria-label="Cari menu" style="width:240px;max-width:100%">'+(db.held.length?'<button class="btn sm ghost" data-act="held">'+ico('pause')+'Tersimpan <span class="badge">'+db.held.length+'</span></button>':'')+'</div><div class="grid" id="grid">'+gridHTML()+'</div></section><aside class="cart'+(S.pos.cartOpen?' open':'')+'" id="cart">'+cartHTML()+'</aside></div><div class="cart-bg'+(S.pos.cartOpen?' on':'')+'" id="cart-bg" data-act="cart-close"></div><button class="cart-fab'+(UI.cartMode==='popup'?' pop':'')+'" id="fab" data-act="cart-toggle"'+(cartCount()?'':' hidden')+'>'+fabHTML()+'</button>';
 };
 
 /* pembayaran */
@@ -2141,6 +2156,7 @@ document.addEventListener('input',e=>{const el=e.target.closest('[data-in]');if(
 document.addEventListener('change',e=>{const el=e.target.closest('[data-ch]');if(el&&CH[el.dataset.ch])CH[el.dataset.ch](el,e)});
 document.addEventListener('keydown',e=>{
   if(e.key==='Escape'&&$('#modal-root').firstChild)closeModal();
+  else if(e.key==='Escape'&&S.pos.cartOpen&&S.view==='pos'){S.pos.cartOpen=false;updatePOS()}
   if(e.key==='Enter'&&e.target.id==='pq'){const l=posProducts();if(l.length===1){ACT.add({dataset:{id:l[0].id}});S.pos.q='';e.target.value='';updatePOS()}}
 });
 

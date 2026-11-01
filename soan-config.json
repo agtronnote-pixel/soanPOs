@@ -59,6 +59,7 @@
     }
   ],
   "kasir": {
+    "keranjang": "popup",
     "ukuranKartu": "normal",
     "tipePesanan": [
       {

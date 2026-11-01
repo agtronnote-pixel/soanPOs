@@ -182,7 +182,7 @@ const REPORTS={trend:'Grafik penjualan (per jam / per hari)',top:'Produk terlari
 const DEFAULT={versi:1,catatan:'Diatur dari Panel Developer (developer/). Boleh diedit manual; nilai yang tidak valid diabaikan.',
   tema:{aksen:'#F2A31B',aksenGelap:'#F5AE2E',sidebar:'#151412',latar:'#F6EFE6'},
   menu:[{id:'pos',label:'Kasir',tampil:true,kasir:true},{id:'sales',label:'Transaksi',tampil:true,kasir:true},{id:'menu',label:'Menu & Bahan',short:'Menu',tampil:true,kasir:false},{id:'reports',label:'Laporan',tampil:true,kasir:false},{id:'customers',label:'Pelanggan',tampil:true,kasir:true},{id:'shift',label:'Shift',tampil:true,kasir:true},{id:'finance',label:'Keuangan',tampil:true,kasir:false},{id:'settings',label:'Pengaturan',tampil:true,kasir:false}],
-  kasir:{ukuranKartu:'normal',tipePesanan:Object.keys(TYPES).map(id=>({id,label:TYPES[id],tampil:true})),metodeBayar:Object.keys(METHODS).map(id=>({id,label:METHODS[id],tampil:true}))},
+  kasir:{keranjang:'popup',ukuranKartu:'normal',tipePesanan:Object.keys(TYPES).map(id=>({id,label:TYPES[id],tampil:true})),metodeBayar:Object.keys(METHODS).map(id=>({id,label:METHODS[id],tampil:true}))},
   laporan:Object.keys(REPORTS).map(id=>({id,tampil:true})),laporanRentang:'7d',
   transaksi:{filterAwal:'today'},menuBahan:{tab:Object.keys(MTABS).map(id=>({id,tampil:true}))},
   teks:{hashtag:'#monggosoan.',judulLogin:'Login to Access'}};
@@ -216,6 +216,7 @@ function normalize(c){
   o.menu=normMenu(c.menu);
   const k=c.kasir||{};
   o.kasir.ukuranKartu=['kecil','normal','besar'].includes(k.ukuranKartu)?k.ukuranKartu:'normal';
+  o.kasir.keranjang=k.keranjang==='samping'?'samping':'popup';
   o.kasir.tipePesanan=normList(k.tipePesanan,Object.keys(TYPES),x=>({id:x.id,label:typeof x.label==='string'&&x.label.trim()?x.label:TYPES[x.id],tampil:x.tampil!==false}));
   o.kasir.metodeBayar=normList(k.metodeBayar,Object.keys(METHODS),x=>({id:x.id,label:typeof x.label==='string'&&x.label.trim()?x.label:METHODS[x.id],tampil:x.tampil!==false}));
   o.laporan=normList(c.laporan,Object.keys(REPORTS),x=>({id:x.id,tampil:x.tampil!==false}));
@@ -315,6 +316,7 @@ function changes(){
   const rn=(L,v)=>(L.find(r=>r[0]===v)||[,v])[1];
   if(a.transaksi.filterAwal!==b.transaksi.filterAwal)out.push(['Transaksi','Filter awal: '+rn(RANGES_S,a.transaksi.filterAwal)+' → '+rn(RANGES_S,b.transaksi.filterAwal)]);
   if(a.laporanRentang!==b.laporanRentang)out.push(['Laporan','Rentang awal: '+rn(RANGES_R,a.laporanRentang)+' → '+rn(RANGES_R,b.laporanRentang)]);
+  if(a.kasir.keranjang!==b.kasir.keranjang)out.push(['Kasir','Panel pesanan: '+(b.kasir.keranjang==='popup'?'popup (muncul saat lanjut transaksi)':'selalu tampil di samping')]);
   if(a.kasir.ukuranKartu!==b.kasir.ukuranKartu)out.push(['Kasir','Ukuran kartu produk: '+a.kasir.ukuranKartu+' → '+b.kasir.ukuranKartu]);
   const TN={aksen:'Warna aksen (terang)',aksenGelap:'Warna aksen (gelap)',sidebar:'Warna menu samping',latar:'Warna latar'};
   Object.keys(TN).forEach(k=>{if(a.tema[k]!==b.tema[k])out.push(['Warna',TN[k]+': '+a.tema[k]+' → '+b.tema[k]])});
@@ -542,7 +544,8 @@ function pageEdHTML(x){
     +(b.t==='gambar'||b.t==='tombol'?'<input class="in urlin" value="'+esc(b.url)+'" data-burl="'+x.id+'" data-i="'+i+'" placeholder="'+(b.t==='gambar'?'Alamat gambar (https://… atau files/gambar/nama.jpg)':'Alamat tujuan (https://…)')+'" aria-label="Alamat">':'')+'</div>').join('');
   return '<div class="pg-ed"><div class="lbl" style="margin-bottom:6px">Isi halaman "'+esc(x.label)+'"</div><div class="zone" data-g="blk:'+x.id+'" data-zone="on">'+(rows||'<div class="empty">Belum ada blok. Tambahkan di bawah.</div>')+'</div><div class="adds" style="margin:8px 0 0">'+Object.keys(BLOK).map(t=>'<button class="btn sm" data-act="blk-add" data-id="'+x.id+'" data-t="'+t+'">+ '+BLOK[t]+'</button>').join('')+'</div></div>';
 }
-SEC_HTML.kasir=()=>'<div class="card"><h3>Tipe pesanan</h3><p class="muted">Tombol pilihan di keranjang. Yang paling atas menjadi pilihan bawaan.</p>'+zonesHTML('tipe',S.cfg.kasir.tipePesanan,'Tampil','Disembunyikan')+'</div>'
+SEC_HTML.kasir=()=>'<div class="card"><h3>Panel pesanan</h3><p class="muted">Popup: menu tampil penuh; setelah memilih menu muncul tombol "Lanjut" untuk membuka pesanan. Samping: panel pesanan selalu tampil di kanan (layar lebar).</p>'+segHTML('cartmode',[['popup','Popup'],['samping','Selalu di samping']],S.cfg.kasir.keranjang)+'</div>'
+  +'<div class="card"><h3>Tipe pesanan</h3><p class="muted">Tombol pilihan di keranjang. Yang paling atas menjadi pilihan bawaan.</p>'+zonesHTML('tipe',S.cfg.kasir.tipePesanan,'Tampil','Disembunyikan')+'</div>'
   +'<div class="card"><h3>Metode pembayaran</h3><p class="muted">Tab di jendela pembayaran. Yang paling atas terpilih otomatis.</p>'+zonesHTML('bayar',S.cfg.kasir.metodeBayar,'Tampil','Disembunyikan')+'</div>'
   +'<div class="card"><h3>Ukuran kartu produk</h3><p class="muted">Kecil = lebih banyak menu per layar, Besar = lebih mudah disentuh.</p>'+segHTML('card',[['kecil','Kecil'],['normal','Normal'],['besar','Besar']],S.cfg.kasir.ukuranKartu)+'</div>';
 SEC_HTML.laporan=()=>'<div class="card"><h3>Kartu laporan</h3><p class="muted">Susun urutan kartu di halaman Laporan. Grafik penjualan selalu selebar layar; kartu lain berpasangan dua-dua.</p>'+zonesHTML('laporan',S.cfg.laporan,'Tampil di Laporan','Disembunyikan')+'</div>';
@@ -638,6 +641,7 @@ ACT.seg=el=>{const k=el.dataset.k,v=el.dataset.v;
   if(k==='role'){S.role=v;saveUI();$$('[data-k="role"]').forEach(b=>b.classList.toggle('on',b.dataset.v===v));sendPreview();return}
   if(k==='theme'){S.theme=v;saveUI();renderEditor();sendPreview();return}
   if(k==='card'){S.cfg.kasir.ukuranKartu=v;changed()}
+  if(k==='cartmode'){S.cfg.kasir.keranjang=v;changed()}
   if(k==='srange'){S.cfg.transaksi.filterAwal=v;changed()}
   if(k==='rrange'){S.cfg.laporanRentang=v;changed()}
 };
