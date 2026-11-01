@@ -1115,7 +1115,7 @@ function rangeTxt(a,b){
   if(d(x)!==d(y))return d(x)+'-'+d(y)+' '+m(x)+' '+Y(x);
   return d(x)+' '+m(x)+' '+Y(x);
 }
-const rpRekap=v=>'Rp. '+Math.round(v||0).toLocaleString('en-US')+',-';
+const rpRekap=v=>'Rp. '+String(Math.round(v||0)).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+',-';
 function shiftRecap(sh){
   const x=shiftStats(sh),prod={},byM={};
   x.ss.forEach(s=>{byM[s.method]=(byM[s.method]||0)+s.total;s.items.forEach(i=>{prod[i.name]=(prod[i.name]||0)+i.qty})});
