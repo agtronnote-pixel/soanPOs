@@ -393,6 +393,12 @@ html,body{max-width:100%;overflow-x:clip}
   .cart-fab{bottom:calc(64px + env(safe-area-inset-bottom,0px));min-height:44px}
   .modal{max-height:96dvh}
 }
+/* Tampilan ringkas (bawaan): sembunyikan teks bantuan kecil */
+body.ringkas .help,body.ringkas .hint,body.ringkas .dv-help,body.ringkas .top .sub,body.ringkas .wa-opt .muted,body.ringkas .dv-sw small{display:none!important}
+body.ringkas .muted{font-size:max(12.5px,1em)}
+body.ringkas :is(td .sub,.ci-sub,.tile .ts,.u-tile span,.cover,.st-opt span,.imp-n small,.rc-row .rc-c,.sub){font-size:12.5px}
+.only-rk{display:none}body.ringkas .only-rk{display:inline-flex}body.ringkas .sec2{display:none}
+@media (max-width:640px){body.ringkas .kpis{grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}body.ringkas .kpis .kpi{padding:12px 14px;border-radius:16px}body.ringkas .kpis .kpi .v{font-size:20px}body.ringkas .kpis>.kpi:last-child:nth-child(odd){grid-column:1/-1}}
 @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
 </style>
 <div id="app"></div>
@@ -776,7 +782,7 @@ const PARTS={
   shift:{t:'Shift',o:[['aktif','Shift berjalan'],['riwayat','Riwayat shift']],f:[['b-rekap','Tombol Rekap'],['b-lapor','Tombol Lapor grup'],['b-kas','Tombol Kas masuk / keluar']]},
   finance:{t:'Keuangan',o:[['kpi','Saldo Drawer & Dompet'],['aksi','Tombol aksi kas'],['invoice','Invoice belum dibayar'],['jurnal','Jurnal kas tunai'],['rincian','Rincian pengeluaran'],['rekap','Rekap penjualan per shift']]},
   inventory:{t:'Inventory',o:[['cek','Tab Cek & sesuaikan stok',1],['log','Tab Riwayat mutasi',1]],f:[['kpi','Ringkasan angka']]},
-  settings:{t:'Pengaturan',o:[['profil','Profil toko'],['pajak','Pajak, layanan, poin, stok'],['pengguna','Pengguna'],['dev','Mode Developer'],['wa','Laporan grup WhatsApp'],['sync','Sinkron'],['printer','Printer struk'],['data','Data']]}
+  settings:{t:'Pengaturan',o:[['profil','Profil toko'],['pajak','Pajak, layanan, poin, stok'],['pengguna','Pengguna'],['dev','Mode Developer'],['wa','Laporan grup WhatsApp'],['sync','Sinkron'],['tampil','Tampilan'],['printer','Printer struk'],['data','Data']]}
 };
 const PART_LOCK={settings:['dev']};
 function partCfg(pg){const o=uiOv(),b=(o&&o.bagian&&o.bagian[pg])||(UI.bagian&&UI.bagian[pg]);return Array.isArray(b)?b:[]}
@@ -824,7 +830,7 @@ function loginHTML(){
   }
   return '<div class="login"><div class="login-art"><svg class="big-ring" viewBox="0 0 100 100" aria-hidden="true" style="color:var(--side-fg);--mark-gap:var(--side)"><circle cx="50" cy="50" r="50" fill="currentColor"/><circle cx="50" cy="50" r="38" fill="var(--side)"/><circle cx="50" cy="50" r="29" fill="var(--amber)"/></svg><div class="txt">'+wordmark+'</div><div class="txt"><h2>'+esc(UI.hashtag)+'</h2><p style="color:var(--side-muted);max-width:36ch">Jl.Taman Lebak Bulus IV Blok X, No.12A, Komplek Lebak Lestari Indah Residence.</p></div></div>'
    +'<div class="login-form"><div><div class="lbl">Masuk</div><h1 style="font-size:28px;margin-top:6px">'+esc(UI.loginTitle)+'</h1></div><div class="u-tiles">'+tiles+'</div>'+pin
-   +'<p class="muted" style="font-size:12px">Akun contoh: Pemilik PIN 1234, Kasir 1 PIN 0000. Ubah di Pengaturan.</p></div></div>';
+   +'<p class="muted help" style="font-size:12px">Akun contoh: Pemilik PIN 1234, Kasir 1 PIN 0000. Ubah di Pengaturan.</p></div></div>';
 }
 
 function sideNavHTML(l,d){
@@ -921,7 +927,7 @@ function updatePOS(){
 function openShiftCard(){
   const last=db.shifts.filter(s=>s.closeTs).sort((a,b)=>b.closeTs-a.closeTs)[0];
   const kb=cashOn()&&db.cashLog.length?cashBal().drawer:null;
-  return '<div class="card center-card">'+mark('mark-lg')+'<h2>Buka shift untuk mulai berjualan</h2><p class="muted">Hitung uang tunai di Drawer (laci kasir), lalu masukkan sebagai kas awal.'+(kb!=null?' Menurut catatan, Drawer berisi '+rp(kb)+'.':'')+'</p><div class="fld" style="width:100%"><label class="lbl" for="oc">Kas awal</label><input class="in" id="oc" inputmode="numeric" value="'+(kb!=null?kb:(last?500000:500000))+'"></div><button class="btn primary" data-act="open-shift">Buka shift</button></div>';
+  return '<div class="card center-card">'+mark('mark-lg')+'<h2>Buka shift untuk mulai berjualan</h2><p class="muted help">Hitung uang tunai di Drawer (laci kasir), lalu masukkan sebagai kas awal.'+(kb!=null?' Menurut catatan, Drawer berisi '+rp(kb)+'.':'')+'</p><div class="fld" style="width:100%"><label class="lbl" for="oc">Kas awal</label><input class="in" id="oc" inputmode="numeric" value="'+(kb!=null?kb:(last?500000:500000))+'"></div><button class="btn primary" data-act="open-shift">Buka shift</button></div>';
 }
 VIEWS.pos=function(){
   if(!curShift())return openShiftCard();
@@ -937,7 +943,7 @@ function payBody(T){
     const sug=[T.total,roundUp(T.total,10000),roundUp(T.total,50000),roundUp(T.total,100000)].filter((v,i,a)=>a.indexOf(v)===i);
     panel='<div class="fld"><label class="lbl" for="recv">Uang diterima</label><input class="in" id="recv" data-in="recv" inputmode="numeric" placeholder="0" value="'+(p.received||'')+'"></div><div class="quick">'+sug.map((v,i)=>'<button class="btn sm ghost" data-act="quick" data-v="'+v+'">'+(i===0?'Uang pas':rp(v))+'</button>').join('')+'</div><div class="change-box"><span class="lbl">Kembalian</span><b id="chg">'+rp(Math.max(0,num(p.received)-T.total))+'</b></div>';
   }else if(p.method==='qris'){
-    panel='<div class="qr-note">'+mark('mark-lg')+'<div><b>Pembayaran QRIS</b><p class="muted">Minta pelanggan memindai QRIS toko, lalu konfirmasi setelah dana masuk.</p></div></div>';
+    panel='<div class="qr-note">'+mark('mark-lg')+'<div><b>Pembayaran QRIS</b><p class="muted help">Minta pelanggan memindai QRIS toko, lalu konfirmasi setelah dana masuk.</p></div></div>';
   }else{
     panel='<div class="fld"><label class="lbl" for="pref">'+(p.method==='debit'?'4 digit kartu / kode approval':'Bank pengirim / catatan')+' (opsional)</label><input class="in" id="pref" data-in="pref" value="'+esc(p.ref)+'"></div>';
   }
@@ -1051,7 +1057,7 @@ VIEWS.sales=function(){
 };
 function voidAsk(id){
   const s=db.sales.find(x=>x.id===id);if(!s)return;
-  modal({title:'Batalkan '+s.no,body:'<p class="muted">Stok produk dikembalikan dan poin pelanggan dikurangi. Transaksi tetap tercatat dengan status dibatalkan.</p><div class="fld"><label class="lbl" for="vr">Alasan</label><select class="sel" id="vr"><option>Salah input pesanan</option><option>Pelanggan membatalkan</option><option>Pembayaran gagal</option><option>Lainnya</option></select></div>',foot:'<button class="btn ghost" data-act="close">Kembali</button><button class="btn danger-solid" data-act="void-go" data-id="'+id+'">Batalkan transaksi</button>'});
+  modal({title:'Batalkan '+s.no,body:'<p class="muted help">Stok produk dikembalikan dan poin pelanggan dikurangi. Transaksi tetap tercatat dengan status dibatalkan.</p><div class="fld"><label class="lbl" for="vr">Alasan</label><select class="sel" id="vr"><option>Salah input pesanan</option><option>Pelanggan membatalkan</option><option>Pembayaran gagal</option><option>Lainnya</option></select></div>',foot:'<button class="btn ghost" data-act="close">Kembali</button><button class="btn danger-solid" data-act="void-go" data-id="'+id+'">Batalkan transaksi</button>'});
 }
 function voidGo(id){
   if(!canDo('void')){toast('Tidak punya akses membatalkan transaksi');return}
@@ -1081,7 +1087,7 @@ function custListHTML(){
 }
 VIEWS.customers=function(){
   const bar=(partOn('customers','cari')?'<input class="in search" data-in="cq" placeholder="Cari nama atau nomor telepon" value="'+esc(S.cq)+'" aria-label="Cari pelanggan" style="width:280px;max-width:100%">':'')+(partOn('customers','tambah')?'<button class="btn primary" data-act="cust-new">'+ico('plus')+'Pelanggan baru</button>':'');
-  return (bar?'<div class="toolbar">'+bar+'</div>':'')+(partOn('customers','info')?'<p class="muted">Pelanggan mendapat 1 poin setiap belanja '+rp(db.settings.pointsPer)+'.</p>':'')+'<div class="card flush" id="clist">'+custListHTML()+'</div>';
+  return (bar?'<div class="toolbar">'+bar+'</div>':'')+(partOn('customers','info')?'<p class="muted help">Pelanggan mendapat 1 poin setiap belanja '+rp(db.settings.pointsPer)+'.</p>':'')+'<div class="card flush" id="clist">'+custListHTML()+'</div>';
 };
 function custForm(id){
   const c=id?custById(id):{name:'',phone:'',notes:''};
@@ -1167,9 +1173,9 @@ VIEWS.reports=function(){
      trend:'<div class="card"><div class="card-h"><h3>'+(S.rr==='today'?'Penjualan per jam':'Penjualan per hari')+'</h3><span class="muted">'+(voids?voids+' transaksi dibatalkan, tidak dihitung':'Termasuk PPN')+'</span></div>'+barChart(series,{hlLast:S.rr!=='today',every,label:'Penjualan'})+'</div>',
      top:'<div class="card"><div class="card-h"><h3>Produk terlaris</h3></div>'+hbars(top,r=>r.q+' pcs · '+rp(r.v))+'</div>',
      cats:'<div class="card"><div class="card-h"><h3>Per kategori</h3></div>'+hbars(cats)+'</div>',
-     gp:'<div class="card"><div class="card-h"><h3>Laba kotor per menu</h3><span class="muted">Sebelum diskon</span></div>'+hbars(gpRows,r=>rp(r.g))+'</div>',
-     use:'<div class="card"><div class="card-h"><h3>Pemakaian bahan baku</h3><span class="muted">Nilai HPP</span></div>'+hbars(useRows,r=>fq(r.q)+' '+r.u+' · '+rp(r.v))+'</div>',
-     hours:'<div class="card"><div class="card-h"><h3>Jam ramai</h3><span class="muted">Total periode</span></div>'+barChart(hours,{h:190,every:2,label:'Penjualan per jam'})+'</div>',
+     gp:'<div class="card"><div class="card-h"><h3>Laba kotor per menu</h3><span class="muted help">Sebelum diskon</span></div>'+hbars(gpRows,r=>rp(r.g))+'</div>',
+     use:'<div class="card"><div class="card-h"><h3>Pemakaian bahan baku</h3><span class="muted help">Nilai HPP</span></div>'+hbars(useRows,r=>fq(r.q)+' '+r.u+' · '+rp(r.v))+'</div>',
+     hours:'<div class="card"><div class="card-h"><h3>Jam ramai</h3><span class="muted help">Total periode</span></div>'+barChart(hours,{h:190,every:2,label:'Penjualan per jam'})+'</div>',
      pay:'<div class="card"><div class="card-h"><h3>Metode pembayaran</h3></div>'+payHTML+'</div>'
    })});
 };
@@ -1178,7 +1184,7 @@ function csvModal(){
   const R=reportData(),q=v=>'"'+String(v).replace(/"/g,'""')+'"';
   const lines=['no,waktu,kasir,pelanggan,jenis,metode,subtotal,diskon,layanan,pajak,total,hpp'];
   R.cur.sort((x,y)=>x.ts-y.ts).forEach(s=>{const cu=s.customerId?custById(s.customerId):null,u=userById(s.userId);lines.push([s.no,fmtDT(s.ts),u?u.name:'',cu?cu.name:'',TYPES[s.type],METHODS[s.method],s.subtotal,s.discount,s.service,s.tax,s.total,s.items.reduce((a,i)=>a+i.cost*i.qty,0)].map(q).join(','))});
-  modal({title:'Data transaksi (CSV)',wide:true,body:'<p class="muted">Salin lalu tempel ke Excel atau Google Sheets.</p><textarea class="ta code" id="csv-ta" readonly>'+esc(lines.join('\n'))+'</textarea>',foot:'<button class="btn ghost" data-act="close">Tutup</button><button class="btn primary" data-act="copy-ta" data-id="csv-ta">'+ico('copy')+'Salin</button>'});
+  modal({title:'Data transaksi (CSV)',wide:true,body:'<p class="muted help">Salin lalu tempel ke Excel atau Google Sheets.</p><textarea class="ta code" id="csv-ta" readonly>'+esc(lines.join('\n'))+'</textarea>',foot:'<button class="btn ghost" data-act="close">Tutup</button><button class="btn primary" data-act="copy-ta" data-id="csv-ta">'+ico('copy')+'Salin</button>'});
 }
 
 /* ========== shift ========== */
@@ -1281,7 +1287,7 @@ async function printRecap(r){
 function recapModal(sh){
   const r=shiftRecap(sh);S.recapId=sh.id;
   const view=recapLines(r).map(l=>l.t?'<div'+(l.b?' class="rk-b"':'')+'>'+esc(l.t)+'</div>':'<div class="rk-e"></div>').join('');
-  modal({title:'Rekap shift',wide:true,body:'<div class="rk">'+view+'</div>'+(r.closed?'':'<p class="muted" style="margin-top:10px">Shift belum ditutup. Uang tunai aktual terisi setelah tutup shift.</p>'),
+  modal({title:'Rekap shift',wide:true,body:'<div class="rk">'+view+'</div>'+(r.closed?'':'<p class="muted help" style="margin-top:10px">Shift belum ditutup. Uang tunai aktual terisi setelah tutup shift.</p>'),
     foot:'<button class="btn ghost" data-act="recap-copy">'+ico('copy')+'Salin teks</button><button class="btn ghost" data-act="recap-print">'+ico('receipt')+'Cetak</button>'+(fiturOn('wa')?'<button class="btn primary" data-act="wa-send" data-ev="tutup" data-id="'+sh.id+'">Kirim ke grup</button>':'')});
 }
 const recapShift=()=>db.shifts.find(x=>x.id===S.recapId);
@@ -1353,7 +1359,7 @@ function waSend(ev,id){
   const name={buka:'Status buka',jalan:'Transaksi berjalan',tutup:'Rekap tutup shift',stok:'Status stok'}[ev];
   modal({title:'Kirim ke grup',wide:!!img,body:'<p class="muted" style="margin:0 0 10px">'+esc(name)+' → <b>'+esc(c.grup)+'</b></p>'
     +(img?'<div class="wa-prev"><img src="'+img+'" alt="Kartu '+esc(name)+'"></div><details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Teks yang ikut dikirim</summary><div class="wa-txt">'+waHTML(txt)+'</div></details>':'<div class="wa-txt">'+waHTML(txt)+'</div>')
-    +'<p class="muted" style="font-size:12px;margin:10px 0 0">Tekan <b>Kirim ke WhatsApp</b>, pilih grup <b>'+esc(c.grup)+'</b>, lalu kirim.'+(img?' Untuk menyematkan di atas grup: tekan lama pesannya di WhatsApp → Sematkan.':'')+'</p>',
+    +'<p class="muted help" style="font-size:12px;margin:10px 0 0">Tekan <b>Kirim ke WhatsApp</b>, pilih grup <b>'+esc(c.grup)+'</b>, lalu kirim.'+(img?' Untuk menyematkan di atas grup: tekan lama pesannya di WhatsApp → Sematkan.':'')+'</p>',
     foot:'<button class="btn ghost" data-act="wa-copy">'+ico('copy')+'Salin teks</button>'+(img?'<a class="btn ghost" href="'+img+'" download="soankofe-'+ev+'-'+isoDate(new Date())+'.png">Simpan gambar</a>':'')+'<button class="btn primary" data-act="wa-go">Kirim ke WhatsApp</button>'});
 }
 ACT['wa-send']=el=>waSend(el.dataset.ev,el.dataset.id||null);
@@ -1405,8 +1411,8 @@ function waCardHTML(){
    +ck('wa-on',c.on,'Aktifkan pengingat lapor ke grup')
    +'<div class="fld"><label class="lbl" for="wa-grup">Nama grup tujuan</label><input class="in" id="wa-grup" value="'+esc(c.grup)+'" placeholder="Soan Kofe · Operasional"></div>'
    +ck('wa-buka',c.buka,'Ingatkan saat shift dibuka (status BUKA)')+ck('wa-tutup',c.tutup,'Ingatkan saat shift ditutup (kartu rekap & kondisi kas)')+ck('wa-stok',c.stok,'Ingatkan saat bahan baku menipis / habis')
-   +'<div class="fld"><label class="lbl" for="wa-jam">Jam lapor transaksi berjalan</label><input class="in" id="wa-jam" value="'+esc(c.jam)+'" placeholder="12:00, 17:00"><span class="muted" style="font-size:12px">Pisahkan dengan koma. Kosongkan bila tidak perlu.</span></div>'
-   +'<p class="muted" style="font-size:12px;margin:0">Pesan dikirim lewat WhatsApp di perangkat ini: aplikasi menyiapkan teks & kartu gambar, kasir memilih grup lalu menekan kirim. Tidak memakai server luar.</p>'
+   +'<div class="fld"><label class="lbl" for="wa-jam">Jam lapor transaksi berjalan</label><input class="in" id="wa-jam" value="'+esc(c.jam)+'" placeholder="12:00, 17:00"><span class="muted help" style="font-size:12px">Pisahkan dengan koma. Kosongkan bila tidak perlu.</span></div>'
+   +'<p class="muted help" style="font-size:12px;margin:0">Pesan dikirim lewat WhatsApp di perangkat ini: aplikasi menyiapkan teks & kartu gambar, kasir memilih grup lalu menekan kirim. Tidak memakai server luar.</p>'
    +'<button class="btn primary" data-act="wa-save">Simpan</button></div></div>';
 }
 ACT['wa-save']=()=>{
@@ -1436,8 +1442,8 @@ function expFormHTML(){
       +'<div class="fld"><label class="lbl" for="fin-ket">Keterangan</label><input class="in" id="fin-ket" list="exp-list" placeholder="Contoh: Bayar parkir"><datalist id="exp-list">'+rec.concat(EXP_QUICK.filter(q=>!rec.includes(q))).map(q=>'<option value="'+esc(q)+'">').join('')+'</datalist></div>'
       +'<div class="chips">'+EXP_QUICK.map(q=>'<button class="chip" type="button" data-act="exp-quick" data-v="'+esc(q)+'">'+esc(q)+'</button>').join('')+'</div>';
   }
-  if(K==='bahan'&&S.expPay==='invoice'&&ings.length)return seg+body+fotoFieldHTML().replace('Foto struk','Foto nota / invoice')+'<p class="muted" style="margin:0">Stok langsung bertambah, tapi uang belum keluar. Pembelian ini masuk daftar <b>Invoice belum dibayar</b> di Keuangan dan dibayar nanti dari sana.</p>';
-  return seg+body+fotoFieldHTML()+'<p class="muted" style="margin:0">Diambil dari Dompet (saldo '+rp(Math.max(0,cashBal().dompet))+'); bila kurang, sisanya dari Drawer.'+(curShift()?' Tercatat juga sebagai kas keluar shift berjalan.':'')+'</p>';
+  if(K==='bahan'&&S.expPay==='invoice'&&ings.length)return seg+body+fotoFieldHTML().replace('Foto struk','Foto nota / invoice')+'<p class="muted help" style="margin:0">Stok langsung bertambah, tapi uang belum keluar. Pembelian ini masuk daftar <b>Invoice belum dibayar</b> di Keuangan dan dibayar nanti dari sana.</p>';
+  return seg+body+fotoFieldHTML()+'<p class="muted help" style="margin:0">Diambil dari Dompet (saldo '+rp(Math.max(0,cashBal().dompet))+'); bila kurang, sisanya dari Drawer.'+(curShift()?' Tercatat juga sebagai kas keluar shift berjalan.':'')+'</p>';
 }
 function expOpen(){S.expKind=S.expKind||'lain';S.expPay='tunai';modal({title:'Catat pengeluaran',body:'<div class="form" id="exp-body">'+expFormHTML()+'</div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="exp-save">Simpan</button>'})}
 function expRefresh(){const b=$('#exp-body');if(!b)return;const keep={amt:($('#fin-amt')||{}).value||'',foto:($('#fin-foto')||{}).value||''};b.innerHTML=expFormHTML();if($('#fin-amt'))$('#fin-amt').value=keep.amt;if($('#fin-foto'))$('#fin-foto').value=keep.foto}
@@ -1505,13 +1511,13 @@ VIEWS.finance=function(){
   const ranges=[['today','Hari ini'],['yesterday','Kemarin'],['7d','7 hari'],['month','Bulan ini'],['all','Semua']];
   const sh=curShift(),shifts=db.shifts.filter(x=>x.closeTs).sort((p,q)=>q.closeTs-p.closeTs).slice(0,6);
   const recRows=(sh?[sh]:[]).concat(shifts).map(x=>{const u=userById(x.userId),st=shiftStats(x);return '<div class="list-row"><div class="l"><b>'+fmtDate(x.openTs)+' · '+fmtTime(x.openTs)+' – '+(x.closeTs?fmtTime(x.closeTs):'berjalan')+'</b><span class="muted">'+esc(u?u.name:'-')+' · penjualan '+rp(st.total)+'</span></div><button class="btn sm ghost" data-act="shift-recap" data-id="'+x.id+'">Rekap</button></div>'}).join('');
-  return (log.length?'':'<div class="banner"><span><b>Mulai pencatatan kas.</b> Isi saldo awal uang di Drawer dan Dompet. Setelah itu penjualan tunai, kas masuk/keluar, dan pembatalan tercatat otomatis.</span><button class="btn sm primary" data-act="fin-adj">Isi saldo awal</button></div>')+parts('finance',{
-   kpi:'<div class="kpis"><div class="kpi hero"><span class="lbl">Uang di Drawer</span><span class="v">'+rp(b.drawer)+'</span><span class="muted" style="font-size:12px">Batas '+rp(lim)+' · lebihnya otomatis ke Dompet</span></div><div class="kpi"><span class="lbl">Uang di Dompet</span><span class="v">'+rp(b.dompet)+'</span><span class="muted" style="font-size:12px">Sumber tunai keluar</span></div><div class="kpi"><span class="lbl">Total kas tunai</span><span class="v">'+rp(b.drawer+b.dompet)+'</span></div></div>',
-   aksi:'<div class="toolbar"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="fin-out">'+ico('wallet')+'Catat pengeluaran</button><button class="btn ghost" data-act="fin-in">'+ico('plus')+'Catat pemasukan</button><button class="btn ghost" data-act="fin-move">Pindah kas</button><button class="btn ghost" data-act="fin-adj">Penyesuaian saldo</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn dark" data-act="fin-print">'+ico('receipt')+'Rekap kas</button><button class="btn ghost" data-act="fin-limit">Batas Drawer</button></div></div>',
+  return (log.length?'':'<div class="banner"><span><b>Mulai pencatatan kas.</b> <span class="help">Isi saldo awal uang di Drawer dan Dompet. Setelah itu penjualan tunai, kas masuk/keluar, dan pembatalan tercatat otomatis.</span></span><button class="btn sm primary" data-act="fin-adj">Isi saldo awal</button></div>')+parts('finance',{
+   kpi:'<div class="kpis"><div class="kpi hero"><span class="lbl">Uang di Drawer</span><span class="v">'+rp(b.drawer)+'</span><span class="muted help" style="font-size:12px">Batas '+rp(lim)+' · lebihnya otomatis ke Dompet</span></div><div class="kpi"><span class="lbl">Uang di Dompet</span><span class="v">'+rp(b.dompet)+'</span><span class="muted help" style="font-size:12px">Sumber tunai keluar</span></div><div class="kpi"><span class="lbl">Total kas tunai</span><span class="v">'+rp(b.drawer+b.dompet)+'</span></div></div>',
+   aksi:'<div class="toolbar"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="fin-out">'+ico('wallet')+'Catat pengeluaran</button><button class="btn ghost sec2" data-act="fin-in">'+ico('plus')+'Catat pemasukan</button><button class="btn ghost sec2" data-act="fin-move">Pindah kas</button><button class="btn ghost sec2" data-act="fin-adj">Penyesuaian saldo</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn dark" data-act="fin-print">'+ico('receipt')+'Rekap kas</button><button class="btn ghost sec2" data-act="fin-limit">Batas Drawer</button><button class="btn ghost only-rk" data-act="fin-more">Lainnya ▾</button></div></div>',
    invoice:invoiceCardHTML(),
-   jurnal:'<div class="card flush"><div class="card-h" style="padding:16px 18px 0;flex-wrap:wrap;gap:10px"><h3>Jurnal kas tunai</h3><div class="chips">'+ranges.map(r=>chip('fin-range',r[0],r[1],F.range)).join('')+'</div><select class="sel" data-ch="fin-akun" aria-label="Filter kas" style="width:auto;flex:0 0 auto"><option value="all"'+(F.akun==='all'?' selected':'')+'>Drawer & Dompet</option><option value="drawer"'+(F.akun==='drawer'?' selected':'')+'>Drawer</option><option value="dompet"'+(F.akun==='dompet'?' selected':'')+'>Dompet</option></select><button class="btn sm ghost" data-act="fin-csv">'+ico('copy')+'Salin CSV</button></div>'+'<p class="muted" style="padding:6px 18px 0;margin:0;font-size:12px">Periode ini: Drawer +'+rp(sum('drawer','debit'))+' / −'+rp(sum('drawer','kredit'))+' · Dompet +'+rp(sum('dompet','debit'))+' / −'+rp(sum('dompet','kredit'))+'</p>'+(tr?'<div class="tablewrap"><table style="min-width:860px"><thead><tr><th>Tanggal</th><th>Kas</th><th class="r">Debit (masuk)</th><th class="r">Kredit (keluar)</th><th>Keterangan</th><th>Foto struk</th><th class="r">Saldo</th></tr></thead><tbody>'+tr+'</tbody></table></div>':'<p class="muted" style="padding:18px">Belum ada catatan kas pada periode ini.</p>')+'</div>',
+   jurnal:'<div class="card flush"><div class="card-h" style="padding:16px 18px 0;flex-wrap:wrap;gap:10px"><h3>Jurnal kas tunai</h3><div class="chips">'+ranges.map(r=>chip('fin-range',r[0],r[1],F.range)).join('')+'</div><select class="sel" data-ch="fin-akun" aria-label="Filter kas" style="width:auto;flex:0 0 auto"><option value="all"'+(F.akun==='all'?' selected':'')+'>Drawer & Dompet</option><option value="drawer"'+(F.akun==='drawer'?' selected':'')+'>Drawer</option><option value="dompet"'+(F.akun==='dompet'?' selected':'')+'>Dompet</option></select><button class="btn sm ghost" data-act="fin-csv">'+ico('copy')+'Salin CSV</button></div>'+'<p class="muted help" style="padding:6px 18px 0;margin:0;font-size:12px">Periode ini: Drawer +'+rp(sum('drawer','debit'))+' / −'+rp(sum('drawer','kredit'))+' · Dompet +'+rp(sum('dompet','debit'))+' / −'+rp(sum('dompet','kredit'))+'</p>'+(tr?'<div class="tablewrap"><table style="min-width:860px"><thead><tr><th>Tanggal</th><th>Kas</th><th class="r">Debit (masuk)</th><th class="r">Kredit (keluar)</th><th>Keterangan</th><th>Foto struk</th><th class="r">Saldo</th></tr></thead><tbody>'+tr+'</tbody></table></div>':'<p class="muted" style="padding:18px">Belum ada catatan kas pada periode ini.</p>')+'</div>',
    rincian:expBreakdownHTML(a,z),
-   rekap:'<div class="card"><div class="card-h"><h3>Rekap penjualan per shift</h3><span class="muted">Siap cetak & kirim WhatsApp</span></div>'+(recRows||'<p class="muted">Belum ada shift.</p>')+'</div>'});
+   rekap:'<div class="card"><div class="card-h"><h3>Rekap penjualan per shift</h3><span class="muted help">Siap cetak & kirim WhatsApp</span></div>'+(recRows||'<p class="muted">Belum ada shift.</p>')+'</div>'});
 };
 /* ---- invoice: bahan sudah diterima, uang belum dibayar (utang ke pemasok) ---- */
 const invOpen=()=>(db.invoices||[]).filter(v=>v.status==='open').sort((a,b)=>(a.due||'9')<(b.due||'9')?-1:(a.due||'9')>(b.due||'9')?1:a.ts-b.ts);
@@ -1524,7 +1530,7 @@ function invoiceCardHTML(){
   if(!op.length&&!paid.length)return '';
   const tot=op.reduce((t,v)=>t+v.jumlah,0);
   const row=v=>{const u=userById(v.userId);return '<div class="list-row"><div class="l"><b>'+esc(v.supplier)+' · '+esc(invLabel(v))+'</b><span class="muted">Diterima '+fmtDate(v.ts)+(u?' · '+esc(u.name):'')+(v.note?' · '+esc(v.note):'')+(v.foto?' · <a href="'+esc(fotoHref(v.foto))+'" target="_blank" rel="noopener">nota</a>':'')+'</span>'+(v.status==='open'?'<span style="margin-top:4px">'+invDue(v)+'</span>':'<span class="muted">Lunas '+fmtDate(v.paidTs)+' · tunai</span>')+'</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><b class="num">'+rp(v.jumlah)+'</b>'+(v.status==='open'?'<button class="btn sm primary" data-act="inv-pay" data-id="'+v.id+'">Bayar</button><button class="icon-btn" data-act="inv-del" data-id="'+v.id+'" aria-label="Hapus invoice">'+ico('trash')+'</button>':'')+'</div></div>'};
-  return '<div class="card"><div class="card-h"><div><h3>Invoice belum dibayar</h3><span class="muted">Bahan sudah masuk stok, pembayaran ke pemasok menyusul</span></div><div style="text-align:right"><span class="lbl">Total utang</span><div class="num" style="font-weight:700;font-size:18px;color:var(--'+(tot?'bad':'ok')+')">'+rp(tot)+'</div></div></div>'
+  return '<div class="card"><div class="card-h"><div><h3>Invoice belum dibayar</h3><span class="muted help">Bahan sudah masuk stok, pembayaran ke pemasok menyusul</span></div><div style="text-align:right"><span class="lbl">Total utang</span><div class="num" style="font-weight:700;font-size:18px;color:var(--'+(tot?'bad':'ok')+')">'+rp(tot)+'</div></div></div>'
    +(op.length?op.map(row).join(''):'<p class="muted">Semua invoice sudah lunas.</p>')
    +(paid.length?'<details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Sudah lunas ('+paid.length+' terakhir)</summary>'+paid.map(row).join('')+'</details>':'')+'</div>';
 }
@@ -1553,7 +1559,7 @@ function finForm(title,body,act){modal({title,body:'<div class="form">'+body+'</
 const amtFld=(id,l,v)=>'<div class="fld"><label class="lbl" for="'+id+'">'+l+'</label><input class="in" id="'+id+'" inputmode="numeric" value="'+(v!=null?v:'')+'" placeholder="0"></div>';
 const ketFld=ph=>'<div class="fld"><label class="lbl" for="fin-ket">Keterangan</label><input class="in" id="fin-ket" placeholder="'+esc(ph)+'"></div>';
 ACT['fin-out']=()=>expOpen();
-ACT['fin-in']=()=>finForm('Catat pemasukan',amtFld('fin-amt','Jumlah')+ketFld('Contoh: Tambah modal kembalian')+fotoFieldHTML()+'<p class="muted" style="margin:0">Masuk ke Drawer. Bila Drawer melebihi '+rp(drawerLimit())+', kelebihannya otomatis ke Dompet.</p>','fin-in-go');
+ACT['fin-in']=()=>finForm('Catat pemasukan',amtFld('fin-amt','Jumlah')+ketFld('Contoh: Tambah modal kembalian')+fotoFieldHTML()+'<p class="muted help" style="margin:0">Masuk ke Drawer. Bila Drawer melebihi '+rp(drawerLimit())+', kelebihannya otomatis ke Dompet.</p>','fin-in-go');
 function finSave(type){
   const a=num($('#fin-amt').value);if(a<=0){toast('Isi jumlah lebih dari 0');return}
   const ket=$('#fin-ket').value.trim(),foto=fotoVal();if(foto===false)return;
@@ -1572,13 +1578,13 @@ ACT['fin-move-go']=()=>{
   cashEntry(from,'kredit',a,(ket||'Pindah kas')+' → '+AKUN[to],{grp:g});cashEntry(to,'debit',a,(ket||'Pindah kas')+' dari '+AKUN[from],{grp:g});
   save();closeModal();render();toast('Kas dipindah');
 };
-ACT['fin-adj']=()=>{const b=cashBal(),first=!(db.cashLog||[]).length;finForm(first?'Isi saldo awal':'Penyesuaian saldo',(first?'<p class="muted" style="margin:0">Hitung uang yang ada sekarang.</p>':'<p class="muted" style="margin:0">Isi hasil hitung uang yang sebenarnya. Selisih dengan catatan dibukukan sebagai penyesuaian.</p>')+amtFld('fin-d','Uang di Drawer',first?'':b.drawer)+amtFld('fin-w','Uang di Dompet',first?'':b.dompet),'fin-adj-go')};
+ACT['fin-adj']=()=>{const b=cashBal(),first=!(db.cashLog||[]).length;finForm(first?'Isi saldo awal':'Penyesuaian saldo',(first?'<p class="muted help" style="margin:0">Hitung uang yang ada sekarang.</p>':'<p class="muted help" style="margin:0">Isi hasil hitung uang yang sebenarnya. Selisih dengan catatan dibukukan sebagai penyesuaian.</p>')+amtFld('fin-d','Uang di Drawer',first?'':b.drawer)+amtFld('fin-w','Uang di Dompet',first?'':b.dompet),'fin-adj-go')};
 ACT['fin-adj-go']=()=>{
   const b=cashBal(),first=!db.cashLog.length,ket=first?'Saldo awal':'Penyesuaian saldo (hitung ulang)';
   [['drawer','#fin-d'],['dompet','#fin-w']].forEach(([ak,id])=>{const v=$(id).value.trim();if(v==='')return;const d=num(v)-b[ak];if(d)cashEntry(ak,d>0?'debit':'kredit',Math.abs(d),ket)});
   save();closeModal();render();toast('Saldo disimpan');
 };
-ACT['fin-limit']=()=>finForm('Batas uang di Drawer',amtFld('fin-lim','Batas',drawerLimit())+'<p class="muted" style="margin:0">Bila uang di Drawer melebihi batas setelah ada tunai masuk, kelebihannya otomatis dipindah ke Dompet.</p>','fin-limit-go');
+ACT['fin-limit']=()=>finForm('Batas uang di Drawer',amtFld('fin-lim','Batas',drawerLimit())+'<p class="muted help" style="margin:0">Bila uang di Drawer melebihi batas setelah ada tunai masuk, kelebihannya otomatis dipindah ke Dompet.</p>','fin-limit-go');
 ACT['fin-limit-go']=()=>{const v=num($('#fin-lim').value);if(v<=0){toast('Isi batas lebih dari 0');return}db.settings.drawerLimit=v;const o=cashOverflow();save();closeModal();render();toast('Batas Drawer '+rp(v)+(o?'. '+rp(o)+' dipindah ke Dompet':''))};
 ACT['fin-csv']=()=>{
   const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"',F=S.fin,[a,z]=finRange(F.range);
@@ -1590,7 +1596,7 @@ ACT['fin-csv']=()=>{
 ACT['fin-print']=()=>{
   const today=new Date(),p=n=>String(n).padStart(2,'0'),iso=today.getFullYear()+'-'+p(today.getMonth()+1)+'-'+p(today.getDate());
   S.kasTs=Date.now();
-  modal({title:'Rekap kas',body:'<div class="fld"><label class="lbl" for="kas-date">Tanggal</label><input class="in" type="date" id="kas-date" data-ch="kas-date" value="'+iso+'" max="'+iso+'"></div><div class="rk" id="kas-view">'+kasViewHTML()+'</div><p class="muted" style="margin-top:8px">Saldo hari ini dihitung sampai saat ini; tanggal lalu dihitung sampai akhir hari itu.</p>',
+  modal({title:'Rekap kas',body:'<div class="fld"><label class="lbl" for="kas-date">Tanggal</label><input class="in" type="date" id="kas-date" data-ch="kas-date" value="'+iso+'" max="'+iso+'"></div><div class="rk" id="kas-view">'+kasViewHTML()+'</div><p class="muted help" style="margin-top:8px">Saldo hari ini dihitung sampai saat ini; tanggal lalu dihitung sampai akhir hari itu.</p>',
     foot:'<button class="btn ghost" data-act="kas-copy">'+ico('copy')+'Salin teks</button>'+(navigator.share?'<button class="btn ghost" data-act="kas-share">Bagikan</button>':'')+'<button class="btn primary" data-act="kas-printgo">'+ico('receipt')+'Cetak</button>'});
 };
 const kasViewHTML=()=>kasLines(S.kasTs).map(l=>l.t?'<div>'+esc(l.t)+'</div>':'<div class="rk-e"></div>').join('');
@@ -1659,13 +1665,13 @@ function bfSummary(){
 }
 function bfHTML(){
   const B=S.bf,ms=Object.keys(METHODS),users=db.users.map(u=>'<option value="'+u.id+'"'+(B.userId===u.id?' selected':'')+'>'+esc(u.name)+'</option>').join('');
-  return '<details class="bf-paste"'+(B.items.some(i=>String(i.name).trim())?'':' open')+'><summary><b>Tempel teks rekap</b> <span class="muted">(format WhatsApp seperti rekap shift)</span></summary><textarea class="in" id="bf-txt" rows="7" placeholder="*Tanggal Penjualan : 26-27 Oct 2026*&#10;&#10;*Total Produk Terjual : 24 Pcs*&#10;Produk Jumlah :&#10;15 Manual Brew&#10;…"></textarea><button class="btn sm dark" data-act="bf-parse" style="margin-top:6px">Baca teks</button></details>'
+  return '<details class="bf-paste"'+(B.items.some(i=>String(i.name).trim())?'':' open')+'><summary><b>Tempel teks rekap</b> <span class="muted help">(format WhatsApp seperti rekap shift)</span></summary><textarea class="in" id="bf-txt" rows="7" placeholder="*Tanggal Penjualan : 26-27 Oct 2026*&#10;&#10;*Total Produk Terjual : 24 Pcs*&#10;Produk Jumlah :&#10;15 Manual Brew&#10;…"></textarea><button class="btn sm dark" data-act="bf-parse" style="margin-top:6px">Baca teks</button></details>'
    +'<div class="fld-row"><div class="fld"><label class="lbl" for="bf-d1">Tanggal mulai</label><input class="in" type="date" id="bf-d1" data-bf="d1" value="'+B.d1+'"></div><div class="fld"><label class="lbl" for="bf-t1">Jam buka</label><input class="in" type="time" id="bf-t1" data-bf="t1" value="'+B.t1+'"></div><div class="fld"><label class="lbl" for="bf-d2">Tanggal selesai</label><input class="in" type="date" id="bf-d2" data-bf="d2" value="'+B.d2+'"></div><div class="fld"><label class="lbl" for="bf-t2">Jam tutup</label><input class="in" type="time" id="bf-t2" data-bf="t2" value="'+B.t2+'"></div><div class="fld"><label class="lbl" for="bf-user">Kasir</label><select class="sel" id="bf-user" data-bf="userId">'+users+'</select></div></div>'
    +'<div class="lbl" style="margin-top:6px">Produk terjual</div><div id="bf-rows">'+B.items.map(bfRowHTML).join('')+'</div><button class="btn sm ghost" data-act="bf-add" style="margin-top:6px">'+ico('plus')+'Tambah produk</button>'
    +'<div class="lbl" style="margin-top:14px">Penerimaan sistem</div><div class="fld-row">'+ms.map(k=>'<div class="fld"><label class="lbl" for="bf-p-'+k+'">'+esc(METHODS[k])+'</label><input class="in" id="bf-p-'+k+'" data-bf="pay" data-k="'+k+'" inputmode="numeric" value="'+(B.pay[k]||'')+'" placeholder="0"></div>').join('')+'</div>'
    +'<div class="lbl" style="margin-top:6px">Arus kas & hitung tunai</div><div class="fld-row"><div class="fld"><label class="lbl" for="bf-ka">Kas awal</label><input class="in" id="bf-ka" data-bf="kasAwal" inputmode="numeric" value="'+(B.kasAwal||'')+'" placeholder="0"></div><div class="fld"><label class="lbl" for="bf-km">Kas masuk</label><input class="in" id="bf-km" data-bf="kasMasuk" inputmode="numeric" value="'+(B.kasMasuk||'')+'" placeholder="0"></div><div class="fld"><label class="lbl" for="bf-kk">Kas keluar</label><input class="in" id="bf-kk" data-bf="kasKeluar" inputmode="numeric" value="'+(B.kasKeluar||'')+'" placeholder="0"></div><div class="fld"><label class="lbl" for="bf-akt">Tunai aktual (hasil hitung)</label><input class="in" id="bf-akt" data-bf="aktual" inputmode="numeric" value="'+(B.aktual!=null?B.aktual:'')+'" placeholder="kosong = sama dengan sistem"></div></div>'
    +'<div class="fld"><label class="lbl" for="bf-kkn">Keterangan kas keluar</label><input class="in" id="bf-kkn" data-bf="kkNote" value="'+esc(B.kkNote||'')+'" placeholder="Contoh: Beli es batu"></div>'
-   +'<p class="muted" id="bf-sum" style="margin:6px 0 0">'+bfSummary()+'</p><p class="muted" style="font-size:12px;margin:6px 0 0">Stok dan saldo Drawer/Dompet tidak diubah, karena kejadiannya sudah lewat.</p>';
+   +'<p class="muted" id="bf-sum" style="margin:6px 0 0">'+bfSummary()+'</p><p class="muted help" style="font-size:12px;margin:6px 0 0">Stok dan saldo Drawer/Dompet tidak diubah, karena kejadiannya sudah lewat.</p>';
 }
 const hhmm=ts=>{const d=new Date(ts);return p2(d.getHours())+':'+p2(d.getMinutes())};
 function bfFromShift(sh){
@@ -1751,7 +1757,7 @@ VIEWS.shift=function(){
   return parts('shift',{aktif:cur,riwayat:'<div class="card flush"><div class="card-h" style="padding:16px 18px 0"><h3>Riwayat shift</h3>'+(fiturOn('backfill')?'<button class="btn sm ghost" data-act="bf-open">'+ico('plus')+'Input rekap terlewat</button>':'')+'</div>'+(hist?'<div class="tablewrap"><table style="min-width:790px"><thead><tr><th>Tanggal</th><th>Kasir</th><th class="r">Kas awal</th><th class="r">Penjualan</th><th class="r">Seharusnya</th><th class="r">Dihitung</th><th>Selisih</th><th class="r">Laporan</th></tr></thead><tbody>'+hist+'</tbody></table></div>':empty('Belum ada shift yang ditutup','Riwayat muncul setelah shift pertama ditutup.'))+'</div>'});
 };
 function cashMove(type){
-  modal({title:type==='in'?'Kas masuk':'Kas keluar',body:'<div class="form"><div class="fld"><label class="lbl" for="cm-amt">Jumlah</label><input class="in" id="cm-amt" inputmode="numeric"></div><div class="fld"><label class="lbl" for="cm-note">Keterangan</label><input class="in" id="cm-note" placeholder="'+(type==='in'?'Contoh: Tambah uang kembalian':'Contoh: Beli es batu')+'"></div>'+fotoFieldHTML()+'<p class="muted" style="margin:0">'+(type==='in'?'Masuk ke Drawer.':'Diambil dari Dompet (saldo '+rp(Math.max(0,cashBal().dompet))+'); bila kurang, sisanya dari Drawer.')+'</p></div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="cash-save" data-v="'+type+'">Simpan</button>'});
+  modal({title:type==='in'?'Kas masuk':'Kas keluar',body:'<div class="form"><div class="fld"><label class="lbl" for="cm-amt">Jumlah</label><input class="in" id="cm-amt" inputmode="numeric"></div><div class="fld"><label class="lbl" for="cm-note">Keterangan</label><input class="in" id="cm-note" placeholder="'+(type==='in'?'Contoh: Tambah uang kembalian':'Contoh: Beli es batu')+'"></div>'+fotoFieldHTML()+'<p class="muted help" style="margin:0">'+(type==='in'?'Masuk ke Drawer.':'Diambil dari Dompet (saldo '+rp(Math.max(0,cashBal().dompet))+'); bila kurang, sisanya dari Drawer.')+'</p></div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="cash-save" data-v="'+type+'">Simpan</button>'});
 }
 const shiftExpected=(sh,x)=>sh.dompetOpen!=null&&cashOn()?cashBal().drawer:x.expected;
 function shiftCloseModal(){
@@ -1770,13 +1776,14 @@ VIEWS.settings=function(){
    dev:devCardHTML(),
    wa:fiturOn('wa')?waCardHTML():'',
    sync:syncCardHTML(),
+   tampil:'<div class="card"><div class="card-h"><h3>Tampilan</h3></div><label class="chk"><input type="checkbox" data-act="ringkas-tog"'+(ringkasOn()?'':' checked')+'>Tampilkan teks bantuan</label><p class="muted help" style="margin:8px 0 0">Berlaku di perangkat ini.</p></div>',
    printer:printerCardHTML(),
    data:'<div class="card"><div class="card-h"><h3>Data</h3></div><div class="form">'+storageStatusHTML()+'<button class="btn ghost" data-act="backup">Cadangkan data</button>'+snapBtn()+'<button class="btn ghost" data-act="restore">Pulihkan dari cadangan</button><button class="btn danger" data-act="clear-demo">Hapus transaksi &amp; pelanggan contoh</button><button class="btn danger" data-act="reset-demo">Reset ke data contoh</button></div></div>'})+'</div>';
 };
 function aksesHTML(st,u){
-  if(st==='owner')return '<p class="muted" style="margin:0">Owner punya akses penuh, termasuk Pengaturan dan pengguna.</p>';
+  if(st==='owner')return '<p class="muted help" style="margin:0">Owner punya akses penuh, termasuk Pengaturan dan pengguna.</p>';
   const on=k=>u&&userStatus(u)===st?canDo(k,u):STATUS[st].akses.includes(k);
-  return '<div class="ak-grid">'+AKSES.map(a=>'<label class="chk"><input type="checkbox" data-ak="'+a[0]+'"'+(on(a[0])?' checked':'')+'>'+esc(a[1])+'</label>').join('')+'</div><p class="muted" style="margin:6px 0 0;font-size:12px">Terisi otomatis sesuai status. Centang atau hilangkan centang untuk mengubah. Pengaturan hanya untuk Owner.</p>';
+  return '<div class="ak-grid">'+AKSES.map(a=>'<label class="chk"><input type="checkbox" data-ak="'+a[0]+'"'+(on(a[0])?' checked':'')+'>'+esc(a[1])+'</label>').join('')+'</div><p class="muted help" style="margin:6px 0 0;font-size:12px">Terisi otomatis sesuai status. Centang atau hilangkan centang untuk mengubah. Pengaturan hanya untuk Owner.</p>';
 }
 function userForm(id){
   const u=id?userById(id):{name:'',role:'cashier',status:'kasir',pin:''},st=userStatus(u);
@@ -2068,7 +2075,7 @@ function impRowsHTML(){
 function impOpen(){
   S.imp={rows:[],stok:false};
   modal({title:'Impor daftar bahan',wide:true,body:'<div class="form"><div class="fld"><label class="lbl" for="imp-txt">Daftar bahan</label><textarea class="ta" id="imp-txt" data-in="imp-txt" rows="7" placeholder="1. Beans Espresso : 700 Gr&#10;2. Fresh Milk (946 ml) : 4 Kotak&#10;3. Tissue : 2 Pack"></textarea><button class="btn sm ghost" data-act="imp-soan" style="align-self:flex-start;margin-top:6px">Pakai daftar bahan Soan Kofe (43)</button></div>'
-   +'<label class="chk"><input type="checkbox" id="imp-stok" data-ch="imp-stok">Ikut isi jumlah stok dari daftar</label><p class="muted" style="font-size:12px;margin:-6px 0 0">Tidak dicentang: hanya nama & satuan yang masuk. Stok diisi lewat Inventory → Cek & sesuaikan stok, dan bahan ditandai <b>Belum dicek</b> sampai dihitung.</p>'
+   +'<label class="chk"><input type="checkbox" id="imp-stok" data-ch="imp-stok">Ikut isi jumlah stok dari daftar</label><p class="muted help" style="font-size:12px;margin:-6px 0 0">Tidak dicentang: hanya nama & satuan yang masuk. Stok diisi lewat Inventory → Cek & sesuaikan stok, dan bahan ditandai <b>Belum dicek</b> sampai dihitung.</p>'
    +'<div id="imp-prev">'+impRowsHTML()+'</div></div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="imp-go">Simpan ke bahan baku</button>'});
 }
 const impRender=()=>{const b=$('#imp-prev');if(b)b.innerHTML=impRowsHTML()};
@@ -2098,7 +2105,7 @@ function menuSumHTML(){
   let banner='';
   if(!db.ingredients.length)banner='<div class="banner"><span><b>Belum ada bahan baku.</b> Tambahkan bahan, lalu hubungkan ke menu lewat resep agar HPP dan stok ikut otomatis.</span><button class="btn sm dark" data-act="mt" data-v="ing">Tambah bahan</button></div>';
   else if(noLink.length)banner='<div class="banner"><span><b>'+noLink.length+' menu belum terhubung ke bahan baku.</b> HPP dan stok bahan belum otomatis untuk menu tersebut.</span><button class="btn sm dark" data-act="mt" data-v="menu">Lihat menu</button></div>';
-  const kpi='<div class="kpis"><div class="kpi"><span class="lbl">Menu aktif</span><span class="v">'+acts.length+'</span><span class="muted">'+rec.length+' memakai resep</span></div><div class="kpi"><span class="lbl">Bahan baku</span><span class="v">'+ings.length+'</span><span class="muted">'+low.length+' perlu restock</span></div><div class="kpi"><span class="lbl">Rata-rata margin</span><span class="v">'+avgM+'%</span><span class="muted">Harga jual dikurangi HPP</span></div><div class="kpi hero"><span class="lbl">Nilai persediaan bahan</span><span class="v">'+rp(val)+'</span></div></div>';
+  const kpi='<div class="kpis"><div class="kpi"><span class="lbl">Menu aktif</span><span class="v">'+acts.length+'</span><span class="muted">'+rec.length+' memakai resep</span></div><div class="kpi"><span class="lbl">Bahan baku</span><span class="v">'+ings.length+'</span><span class="muted">'+low.length+' perlu restock</span></div><div class="kpi"><span class="lbl">Rata-rata margin</span><span class="v">'+avgM+'%</span><span class="muted help">Harga jual dikurangi HPP</span></div><div class="kpi hero"><span class="lbl">Nilai persediaan bahan</span><span class="v">'+rp(val)+'</span></div></div>';
   const lowRows=low.length?low.map(g=>'<div class="list-row"><div class="l"><b>'+esc(g.name)+'</b><span class="cover">'+fq(g.stock)+' '+g.unit+' · min '+fq(g.min)+' · sisa '+coverTxt(g,rate)+'</span></div><button class="btn sm primary" data-act="ing-restock" data-id="'+g.id+'">Restock</button></div>').join(''):'<p class="muted" style="padding:6px 0">Semua bahan di atas batas minimum.</p>';
   const tight=acts.map(p=>({p,a:avail(p,{},0)})).filter(x=>x.a.n!==null&&x.a.n<=(modeOf(x.p)==='stock'?x.p.min:5)).sort((x,y)=>x.a.n-y.a.n).slice(0,6);
   const tightRows=tight.length?tight.map(x=>'<div class="list-row"><div class="l"><b>'+esc(x.p.name)+'</b><span class="cover">'+(x.a.lim?'Dibatasi '+esc(x.a.lim.name):'Stok produk jadi')+'</span></div><span class="pill '+(x.a.n<=0?'bad':'warn')+'">'+(x.a.n<=0?'Habis':'Sisa '+x.a.n)+'</span></div>').join(''):'<p class="muted" style="padding:6px 0">Tidak ada menu yang hampir habis.</p>';
@@ -2109,8 +2116,8 @@ function menuSumHTML(){
   return banner+kpi
    +'<div class="grid-2"><div class="card"><div class="card-h"><h3>Perlu restock</h3>'+(low.length?'<button class="btn sm ghost" data-act="shop-list">'+ico('copy')+'Salin daftar belanja</button>':'')+'</div>'+lowRows+'</div>'
    +'<div class="card"><div class="card-h"><h3>Menu hampir habis</h3></div>'+tightRows+'</div></div>'
-   +'<div class="grid-2"><div class="card"><div class="card-h"><h3>Margin terendah</h3><span class="muted">Ketuk untuk ubah resep</span></div>'+mRows+'</div>'
-   +'<div class="card"><div class="card-h"><h3>Pemakaian bahan 7 hari</h3><span class="muted">Nilai HPP</span></div>'+hbars(useRows,r=>fq(r.q)+' '+r.u+' · '+rp(r.v))+'</div></div>';
+   +'<div class="grid-2"><div class="card"><div class="card-h"><h3>Margin terendah</h3><span class="muted help">Ketuk untuk ubah resep</span></div>'+mRows+'</div>'
+   +'<div class="card"><div class="card-h"><h3>Pemakaian bahan 7 hari</h3><span class="muted help">Nilai HPP</span></div>'+hbars(useRows,r=>fq(r.q)+' '+r.u+' · '+rp(r.v))+'</div></div>';
 }
 function menuTabHTML(){
   return '<div class="toolbar"><div class="toolbar-r"><input class="in search" data-in="pq" placeholder="Cari menu atau SKU" value="'+esc(S.pq)+'" aria-label="Cari menu"><select class="sel" data-ch="pc" aria-label="Kategori"><option value="all">Semua kategori</option>'+db.categories.map(c=>'<option value="'+c.id+'"'+(S.pc===c.id?' selected':'')+'>'+esc(c.name)+'</option>').join('')+'</select></div><div class="toolbar-r"><button class="btn ghost" data-act="cat-manage">Kategori</button><button class="btn primary" data-act="prod-new">'+ico('plus')+'Menu baru</button></div></div><div class="card flush" id="plist">'+productListHTML()+'</div>';
@@ -2126,7 +2133,7 @@ function logTabHTML(){
   rows.sort((a,b)=>b.ts-a.ts);
   if(!rows.length)return '<div class="card flush">'+empty('Belum ada mutasi','Restock, opname, dan penjualan akan tercatat di sini.')+'</div>';
   const body=rows.slice(0,100).map(l=>{const u=userById(l.by);return '<tr><td>'+fmtDT(l.ts)+'</td><td><b>'+esc(l.name)+'</b> <span class="pill">'+l.kind+'</span></td><td>'+esc(ING_T[l.type]||l.type)+'</td><td class="r"><b style="color:var(--'+(l.qty<0?'bad':'ok')+')">'+(l.qty>0?'+':'')+fq(l.qty)+' '+l.unit+'</b></td><td>'+esc(l.note||'')+(l.cost?' <span class="muted">· '+rpd(l.cost)+'/'+l.unit+'</span>':'')+'</td><td>'+esc(u?u.name:'-')+'</td></tr>'}).join('');
-  return '<div class="card flush"><div class="tablewrap"><table style="min-width:720px"><thead><tr><th>Waktu</th><th>Item</th><th>Jenis</th><th class="r">Jumlah</th><th>Catatan</th><th>Oleh</th></tr></thead><tbody>'+body+'</tbody></table></div></div>'+(rows.length>100?'<p class="muted">Menampilkan 100 mutasi terbaru.</p>':'');
+  return '<div class="card flush"><div class="tablewrap"><table style="min-width:720px"><thead><tr><th>Waktu</th><th>Item</th><th>Jenis</th><th class="r">Jumlah</th><th>Catatan</th><th>Oleh</th></tr></thead><tbody>'+body+'</tbody></table></div></div>'+(rows.length>100?'<p class="muted help">Menampilkan 100 mutasi terbaru.</p>':'');
 }
 /* ========== Panel Inventory: cek fisik & penyesuaian stok (untuk staf inventory) ==========
    Bekerja langsung pada db.ingredients & produk stok, jadi hasilnya sama dengan Menu & Bahan. */
@@ -2163,7 +2170,7 @@ VIEWS.inventory=function(){
   return KP+tabs+'<div class="toolbar"><div class="chips">'+fl.map(f=>chip('inv-f',f[0],f[1],I.f)).join('')+'</div><input class="in search" data-in="inv-q" id="inv-q" placeholder="Cari bahan / produk" value="'+esc(I.q)+'" aria-label="Cari item" style="width:220px;max-width:100%"></div>'
    +(body||'<div class="card">'+empty('Tidak ada item','Ubah filter atau kata kunci pencarian.')+'</div>')
    +'<div class="inv-foot"><span class="muted" id="inv-ft" style="flex:1 1 220px">'+ft.t+'</span><input class="in" id="inv-note" placeholder="Catatan cek (opsional), mis. cek mingguan" aria-label="Catatan cek"><button class="btn ghost sm" data-act="inv-clear">Kosongkan</button><button class="btn primary" data-act="inv-save">Simpan hasil cek</button></div>'
-   +'<p class="muted" style="font-size:12px;margin:8px 2px 0">Stok yang disimpan di sini langsung berlaku di Menu & Bahan, resep, dan penjualan. Setiap perubahan tercatat sebagai Opname di Riwayat mutasi.</p>';
+   +'<p class="muted help" style="font-size:12px;margin:8px 2px 0">Stok yang disimpan di sini langsung berlaku di Menu & Bahan, resep, dan penjualan. Setiap perubahan tercatat sebagai Opname di Riwayat mutasi.</p>';
 };
 ACT['inv-tab']=el=>{S.inv.tab=el.dataset.v;render()};
 ACT['inv-f']=el=>{S.inv.f=el.dataset.v;render()};
@@ -2401,7 +2408,7 @@ ACT['pr-test']=()=>{doPrint(testSale(),true)};
 ACT['print-sale']=el=>{const s=db.sales.find(x=>x.id===el.dataset.id);if(s)doPrint(s,true)};
 ACT['pr-preview']=()=>{
   const c=printerCfg(),cols=c.paper===80?48:32;
-  modal({title:'Pratinjau struk '+c.paper+' mm',body:'<p class="muted">Tampilan teks. Pada printer, nama toko tercetak besar dan baris tebal ditebalkan.</p><pre class="receipt" style="overflow-x:auto;margin:0;white-space:pre">'+esc(plainText(receiptLayout(testSale(),cols),cols))+'</pre>',foot:'<button class="btn dark" data-act="close">Tutup</button>'});
+  modal({title:'Pratinjau struk '+c.paper+' mm',body:'<p class="muted help">Tampilan teks. Pada printer, nama toko tercetak besar dan baris tebal ditebalkan.</p><pre class="receipt" style="overflow-x:auto;margin:0;white-space:pre">'+esc(plainText(receiptLayout(testSale(),cols),cols))+'</pre>',foot:'<button class="btn dark" data-act="close">Tutup</button>'});
 };
 
 /* ========== aksi ========== */
@@ -2600,12 +2607,12 @@ ACT['user-save']=el=>{
   save();closeModal();render();toast('Pengguna disimpan');
 };
 ACT['user-del']=el=>{const id=el.dataset.id,u=userById(id);if(u.role==='owner'&&db.users.filter(x=>x.role==='owner').length<2){toast('Harus ada minimal satu pemilik');return}confirmBox('Hapus pengguna','Pengguna tidak bisa masuk lagi. Riwayat transaksinya tetap tersimpan.','Hapus',()=>{db.users=db.users.filter(x=>x.id!==id);save();render();toast('Pengguna dihapus')})};
-ACT.backup=()=>modal({title:'Cadangan data',wide:true,body:'<p class="muted">Simpan cadangan di tempat aman. Tombol Unduh menyimpan berkas .json (berfungsi di versi mandiri). Di halaman lain, salin teksnya dan simpan di catatan.</p><textarea class="ta code" id="bk-ta" readonly>'+esc(JSON.stringify(db))+'</textarea>',foot:'<button class="btn ghost" data-act="close">Tutup</button><button class="btn ghost" data-act="dl-backup">Unduh .json</button><button class="btn primary" data-act="copy-ta" data-id="bk-ta">'+ico('copy')+'Salin</button>'});
+ACT.backup=()=>modal({title:'Cadangan data',wide:true,body:'<p class="muted help">Simpan cadangan di tempat aman. Tombol Unduh menyimpan berkas .json (berfungsi di versi mandiri). Di halaman lain, salin teksnya dan simpan di catatan.</p><textarea class="ta code" id="bk-ta" readonly>'+esc(JSON.stringify(db))+'</textarea>',foot:'<button class="btn ghost" data-act="close">Tutup</button><button class="btn ghost" data-act="dl-backup">Unduh .json</button><button class="btn primary" data-act="copy-ta" data-id="bk-ta">'+ico('copy')+'Salin</button>'});
 ACT['dl-backup']=()=>{
   try{const blob=new Blob([JSON.stringify(db)],{type:'application/json'}),a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download='soan-kofe-cadangan-'+new Date().toISOString().slice(0,10)+'.json';document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);toast('Berkas cadangan diunduh')}
   catch(e){toast('Unduhan tidak tersedia di halaman ini. Gunakan Salin.')}
 };
-ACT.restore=()=>modal({title:'Pulihkan data',wide:true,body:'<p class="muted">Pilih berkas cadangan .json atau tempel teks cadangan. Data saat ini diganti seluruhnya, dan disimpan dulu sebagai cadangan otomatis.</p><input type="file" id="rs-file" data-ch="rs-file" accept=".json,application/json" class="in"><textarea class="ta code" id="rs-ta" placeholder="Atau tempel cadangan di sini"></textarea>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn danger-solid" data-act="restore-go">Pulihkan</button>'});
+ACT.restore=()=>modal({title:'Pulihkan data',wide:true,body:'<p class="muted help">Pilih berkas cadangan .json atau tempel teks cadangan. Data saat ini diganti seluruhnya, dan disimpan dulu sebagai cadangan otomatis.</p><input type="file" id="rs-file" data-ch="rs-file" accept=".json,application/json" class="in"><textarea class="ta code" id="rs-ta" placeholder="Atau tempel cadangan di sini"></textarea>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn danger-solid" data-act="restore-go">Pulihkan</button>'});
 CH['rs-file']=el=>{const f=el.files&&el.files[0];if(!f)return;const r=new FileReader();r.onload=()=>{$('#rs-ta').value=String(r.result||'')};r.readAsText(f)};
 ACT['restore-snap']=()=>{
   let d;try{d=JSON.parse(lsGet(SNAP_KEY))}catch(e){toast('Cadangan otomatis tidak bisa dibaca');return}
@@ -2770,14 +2777,14 @@ addEventListener('online',()=>{if(syncOn()){if(!SG.started)syncStart();else sync
 /* ---- tampilan di Pengaturan ---- */
 function syncCardHTML(){
   const on=syncOn(),local=SG.mode==='local';
-  if(!local&&!on)return '<div class="card"><div class="card-h"><h3>Sinkron antar perangkat</h3></div><div class="form"><p class="muted">Mati. Data hanya ada di perangkat ini.</p><p class="muted">Untuk menyinkronkan tablet, laptop, dan HP, buka aplikasi dari <b>Server Lokal Soan Kofe</b> di komputer kedai (alamat seperti http://192.168.1.10:8080). Sinkron, berkas, dan laporan CSV tersedia di sana.</p></div></div>';
+  if(!local&&!on)return '<div class="card"><div class="card-h"><h3>Sinkron antar perangkat</h3></div><div class="form"><p class="muted">Mati. Data hanya ada di perangkat ini.</p><p class="muted help">Untuk menyinkronkan tablet, laptop, dan HP, buka aplikasi dari <b>Server Lokal Soan Kofe</b> di komputer kedai (alamat seperti http://192.168.1.10:8080). Sinkron, berkas, dan laporan CSV tersedia di sana.</p></div></div>';
   return '<div class="card"><div class="card-h"><h3>Sinkron antar perangkat</h3>'+(on?'<span class="pill ok">Aktif</span>':'<span class="pill amber">Server lokal</span>')+'</div><div class="form">'
    +'<p class="muted" id="sync-status">'+syncStatusText()+'</p>'
    +(on?'<button class="btn ghost" data-act="sync-now">Sinkron sekarang</button><button class="btn danger" data-act="sync-off">Matikan sinkron di perangkat ini</button>'
-       :'<p class="muted">Aplikasi ini dibuka dari server lokal kedai. Aktifkan sinkron agar tablet, laptop, dan HP yang tersambung ke WiFi kedai memakai data yang sama secara real-time.</p><button class="btn primary" data-act="sync-on">Aktifkan sinkron</button>')
+       :'<p class="muted help">Aplikasi ini dibuka dari server lokal kedai. Aktifkan sinkron agar tablet, laptop, dan HP yang tersambung ke WiFi kedai memakai data yang sama secara real-time.</p><button class="btn primary" data-act="sync-on">Aktifkan sinkron</button>')
    +'</div></div>'+filesCardHTML();
 }
-ACT['sync-on']=()=>modal({title:'Aktifkan sinkron',body:'<p class="muted">Buat kode toko rahasia (minimal 8 karakter: huruf kecil, angka, tanda -, tanpa spasi). Masukkan kode yang <b>sama persis</b> di setiap perangkat. Kode ini berfungsi seperti kata sandi data toko.</p><div class="fld"><label class="lbl" for="sync-code">Kode toko</label><input class="in" id="sync-code" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="contoh: soankofe-lebakbulus-27"></div><p class="muted">Aktifkan lebih dulu di perangkat yang datanya paling lengkap (tablet kasir).</p>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="sync-go">Lanjut</button>'});
+ACT['sync-on']=()=>modal({title:'Aktifkan sinkron',body:'<p class="muted help">Buat kode toko rahasia (minimal 8 karakter: huruf kecil, angka, tanda -, tanpa spasi). Masukkan kode yang <b>sama persis</b> di setiap perangkat. Kode ini berfungsi seperti kata sandi data toko.</p><div class="fld"><label class="lbl" for="sync-code">Kode toko</label><input class="in" id="sync-code" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="contoh: soankofe-lebakbulus-27"></div><p class="muted help">Aktifkan lebih dulu di perangkat yang datanya paling lengkap (tablet kasir).</p>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="sync-go">Lanjut</button>'});
 ACT['sync-go']=async el=>{
   const code=($('#sync-code').value||'').trim().toLowerCase().replace(/\s+/g,'-');
   if(!/^[a-z0-9-]{8,40}$/.test(code)){toast('Kode minimal 8 karakter: huruf kecil, angka, atau tanda - (tanpa spasi)');return}
@@ -2822,8 +2829,8 @@ function filesCardHTML(){
   return '<div class="card"><div class="card-h"><h3>Berkas &amp; laporan</h3><button class="btn sm ghost" data-act="files-refresh">Muat ulang</button></div><div class="form">'
    +'<h4 style="margin:0 0 4px">Cadangan</h4><div id="bk-status">'+backupStatusHTML()+'</div>'
    +'<a class="btn ghost" href="api/backup.zip?code='+encodeURIComponent(fileCode())+'" download data-act="bk-zip">Unduh cadangan lengkap ke perangkat ini (.zip)</a>'
-   +'<p class="muted" style="margin-top:4px">Berisi semua data toko, laporan, gambar, dan dokumen. Tersimpan di folder Download perangkat ini. Simpan juga ke Google Drive dari HP bila perlu.</p>'
-   +'<h4 style="margin:14px 0 4px">Berkas</h4><p class="muted">Laporan penjualan harian dan rekap bulanan (CSV, bisa dibuka di Excel) dibuat otomatis oleh server. Gambar dan dokumen yang diunggah tersimpan di komputer server.</p>'
+   +'<p class="muted help" style="margin-top:4px">Berisi semua data toko, laporan, gambar, dan dokumen. Tersimpan di folder Download perangkat ini. Simpan juga ke Google Drive dari HP bila perlu.</p>'
+   +'<h4 style="margin:14px 0 4px">Berkas</h4><p class="muted help">Laporan penjualan harian dan rekap bulanan (CSV, bisa dibuka di Excel) dibuat otomatis oleh server. Gambar dan dokumen yang diunggah tersimpan di komputer server.</p>'
    +'<div class="fld"><label class="lbl" for="up-folder">Unggah ke</label><select class="in" id="up-folder"><option value="gambar">Gambar</option><option value="dokumen">Dokumen</option><option value="laporan">Laporan</option></select></div>'
    +'<input type="file" id="up-file" multiple data-ch="file-up" style="display:none"><button class="btn ghost" data-act="file-pick">'+ico('plus')+'Pilih berkas untuk diunggah</button>'
    +'<div id="file-list">'+filesListHTML()+'</div></div></div>';
@@ -2849,7 +2856,7 @@ function backupStatusHTML(){
   const drv=d.on?'<span class="pill ok">Google Drive aktif</span> Disalin otomatis ke <b>'+esc(d.folder||'Google Drive')+'</b>'+(d.last?', terakhir '+fmtDT(d.last):'')+' ('+(d.files||0)+' berkas + data).'
     :d.err?'<span class="pill bad">Google Drive gagal</span> '+esc(d.err)
     :'<span class="pill amber">Google Drive belum terpasang</span> Pasang Google Drive for desktop di komputer server agar data dicadangkan otomatis.';
-  return '<p class="muted">'+drv+'</p><p class="muted">Komputer server juga menyimpan cadangan harian 60 hari terakhir.</p>'+(d.on?'<button class="btn sm ghost" data-act="bk-drive">Cadangkan ke Google Drive sekarang</button>':'');
+  return '<p class="muted">'+drv+'</p><p class="muted help">Komputer server juga menyimpan cadangan harian 60 hari terakhir.</p>'+(d.on?'<button class="btn sm ghost" data-act="bk-drive">Cadangkan ke Google Drive sekarang</button>':'');
 }
 ACT['bk-zip']=()=>toast('Menyiapkan cadangan lengkap…');
 ACT['bk-drive']=async()=>{toast('Mencadangkan ke Google Drive…');try{const r=await fetch('api/drive/now',{method:'POST',headers:{'x-store-code':fileCode()}});const j=await r.json();toast(j.ok?'Cadangan Google Drive selesai':'Gagal: '+(j.err||'tidak diketahui'))}catch(e){toast('Server tidak terjangkau')}filesLoad()};
@@ -2997,15 +3004,23 @@ document.addEventListener('click',e=>{const el=e.target.closest('#devbar [data-d
 document.addEventListener('change',e=>{const el=e.target.closest('#devbar [data-dvc]');if(el&&S.dev)devChange(el)});
 function devCardHTML(){
   const o=db.settings.ui,u=o&&userById(o.by);
-  return '<div class="card"><div class="card-h"><h3>Mode Developer</h3><button class="btn sm primary" data-act="dev-open">Buka Bilah Developer</button></div><p class="muted" style="margin:0">Atur navigasi, sub menu, fitur, halaman Kasir, dan tampilan langsung dari POS. Perubahan terlihat seketika dan ikut sinkron ke semua perangkat.</p>'
-   +(o?'<p class="muted" style="font-size:12px;margin:8px 0 0">Pengaturan aktif dari Bilah Developer'+(o.ts?' · diubah '+fmtDT(o.ts):'')+(u?' oleh '+esc(u.name):'')+'</p>':'<p class="muted" style="font-size:12px;margin:8px 0 0">Sekarang memakai pengaturan dasar dari Panel Developer.</p>')+'</div>';
+  return '<div class="card"><div class="card-h"><h3>Mode Developer</h3><button class="btn sm primary" data-act="dev-open">Buka Bilah Developer</button></div><p class="muted help" style="margin:0">Atur navigasi, sub menu, fitur, halaman Kasir, dan tampilan langsung dari POS. Perubahan terlihat seketika dan ikut sinkron ke semua perangkat.</p>'
+   +(o?'<p class="muted help" style="font-size:12px;margin:8px 0 0">Pengaturan aktif dari Bilah Developer'+(o.ts?' · diubah '+fmtDT(o.ts):'')+(u?' oleh '+esc(u.name):'')+'</p>':'<p class="muted help" style="font-size:12px;margin:8px 0 0">Sekarang memakai pengaturan dasar dari Panel Developer.</p>')+'</div>';
 }
 ACT['dev-open']=()=>{if(!isOwner()){toast('Bilah Developer khusus Owner');return}if(!S.dev)devStart()};
+
+ACT['fin-more']=()=>{const it=(a,t)=>'<button class="list-row wa-opt" data-act="'+a+'"><div class="l"><b>'+t+'</b></div><span class="muted">›</span></button>';modal({title:'Kas lainnya',body:it('fin-in','Catat pemasukan')+it('fin-move','Pindah kas')+it('fin-adj','Penyesuaian saldo')+it('fin-limit','Batas Drawer')})};
+/* ---- tampilan ringkas: per perangkat ---- */
+const RINGKAS_KEY='soankofe.pos.ringkas';
+function ringkasOn(){return lsGet(RINGKAS_KEY)!=='0'}
+function ringkasApply(){document.body.classList.toggle('ringkas',ringkasOn())}
+ACT['ringkas-tog']=()=>{lsSet(RINGKAS_KEY,ringkasOn()?'0':'1');ringkasApply();render();toast(ringkasOn()?'Tampilan ringkas aktif':'Teks bantuan ditampilkan')};
 
 /* ========== boot ========== */
 (function init(){
   const t=lsGet(THEME_KEY);if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);
   probeStorage();
+  ringkasApply();
   if(!PREVIEW)syncCfgLoad();
   load();
   loadConfig();
