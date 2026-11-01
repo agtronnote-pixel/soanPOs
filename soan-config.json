@@ -52,6 +52,12 @@
       "kasir": false
     },
     {
+      "id": "inventory",
+      "label": "Inventory",
+      "tampil": true,
+      "kasir": false
+    },
+    {
       "id": "settings",
       "label": "Pengaturan",
       "tampil": true,
