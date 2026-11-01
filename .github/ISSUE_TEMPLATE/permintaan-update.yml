@@ -1,0 +1,43 @@
+name: Permintaan update aplikasi
+description: Minta Claude mengubah tampilan, fitur, atau memperbaiki masalah Soan Kofe POS
+title: "Update: "
+labels: ["update"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Tulis perubahan yang diinginkan dengan bahasa biasa. Claude akan mengerjakannya otomatis,
+        lalu membalas di sini dengan ringkasan dan link Pull Request. Perubahan baru tayang setelah
+        Pull Request di-**Merge**.
+  - type: dropdown
+    id: jenis
+    attributes:
+      label: Jenis perubahan
+      options:
+        - Tampilan / UI
+        - Fitur baru
+        - Perbaikan masalah (bug)
+        - Laporan / data
+        - Server lokal / cadangan
+        - Lainnya
+    validations:
+      required: true
+  - type: textarea
+    id: detail
+    attributes:
+      label: Apa yang ingin diubah?
+      description: Jelaskan sedetail mungkin. Boleh lampirkan screenshot atau foto sketsa.
+      value: |
+        @claude
+
+        Halaman/menu:
+        Yang diinginkan:
+        Contoh/alasan:
+    validations:
+      required: true
+  - type: checkboxes
+    id: cek
+    attributes:
+      label: Konfirmasi
+      options:
+        - label: Saya sudah mencadangkan data tablet (Pengaturan > Data > Cadangkan data) bila perubahan menyangkut data.
