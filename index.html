@@ -373,6 +373,7 @@ const PREVIEW=/[?&]preview=1(&|$)/.test(location.search);
 const UI={types:['dine','take','delivery'],methods:['cash','qris','debit','transfer'],reports:['trend','top','cats','gp','use','hours','pay'],hashtag:'#monggosoan.',loginTitle:'Login to Access',salesRange:'today',reportRange:'7d',mtabs:['sum','menu','ing','log']};
 
 const ICONS={
+wallet:'<path d="M4 7.5A2.5 2.5 0 0 1 6.5 5H18v3"/><rect x="3" y="8" width="18" height="11" rx="2.5"/><path d="M16 13.5h2"/>',
 folder:'<path d="M3 7.5A2.5 2.5 0 0 1 5.5 5h3.6l2 2h7.4A2.5 2.5 0 0 1 21 9.5v7a2.5 2.5 0 0 1-2.5 2.5h-13A2.5 2.5 0 0 1 3 16.5z"/>',
 link:'<path d="M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1"/><path d="M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1"/>',
 page:'<path d="M7 3h7l5 5v13H7z"/><path d="M14 3v5h5M10 13h6M10 17h4"/>',
@@ -426,6 +427,8 @@ function migrate(d){
   if(!Array.isArray(d.ingredients)){d.ingredients=[];ch=true}
   if(!Array.isArray(d.ingLog)){d.ingLog=[];ch=true}
   if(d.settings.blockOut===undefined){d.settings.blockOut=true;ch=true}
+  if(!Array.isArray(d.cashLog)){d.cashLog=[];ch=true}
+  if(d.settings.drawerLimit===undefined){d.settings.drawerLimit=200000;ch=true}
   if((d.v||1)<2){
     if(d.demo&&!d.ingredients.length)demoIngredients(d.ingredients,d.ingLog,d.products,Date.now());
     d.products.forEach(p=>{if(!p.mode)p.mode=hasRecipe(p)?'recipe':p.track?'stock':'none'});
@@ -501,7 +504,8 @@ function seed(){
     shifts.push(sh);
   }
   products.filter(p=>p.track).forEach(p=>stockLog.push({id:uid(),ts:addDays(now,-14),pid:p.id,type:'restock',qty:p.stock,note:'Stok awal',userId:'u-owner'}));
-  return{v:2,settings:st,users,categories,products,customers,sales,held:[],stockLog,ingredients,ingLog,shifts,seq:{sale:seq},demo:true};
+  st.drawerLimit=200000;
+  return{v:2,settings:st,users,categories,products,customers,sales,held:[],stockLog,ingredients,ingLog,shifts,cashLog:[],seq:{sale:seq},demo:true};
 }
 
 /* ========== state & db ========== */
@@ -573,6 +577,7 @@ const NAV=[
  {id:'reports',label:'Laporan',icon:'chart',roles:['owner']},
  {id:'customers',label:'Pelanggan',icon:'users',roles:['owner','cashier']},
  {id:'shift',label:'Shift',icon:'clock',roles:['owner','cashier']},
+ {id:'finance',label:'Keuangan',icon:'wallet',roles:['owner']},
  {id:'settings',label:'Pengaturan',icon:'gear',roles:['owner']}
 ];
 const allowedNav=()=>NAV.filter(n=>n.roles.includes(S.user.role));
@@ -638,7 +643,7 @@ function buildNav(list){
   });return out};
   const tree=walk(list,1,false,false);
   ['pos','settings'].forEach(id=>{if(!JSON.stringify(tree).includes('"id":"'+id+'"'))tree.push({kind:'view',id})});
-  VIEW_IDS.forEach(id=>{if(!seen.has(id))tree.push({kind:'view',id})});
+  VIEW_IDS.forEach(id=>{if(seen.has(id))return;const si=tree.findIndex(n=>n.kind==='view'&&n.id==='settings');if(si>=0)tree.splice(si,0,{kind:'view',id});else tree.push({kind:'view',id})});
   return {tree,pages};
 }
 let mtFirst=null;
@@ -701,7 +706,7 @@ addEventListener('message',e=>{
   if(jump)closeModal();render();
 });
 const canView=v=>allowedNav().some(n=>n.id===v);
-const SUBS={pos:'Pilih menu, atur pesanan, lalu terima pembayaran',sales:'Riwayat struk dan pembatalan transaksi',menu:'Menu, resep, bahan baku, dan stok',reports:'Penjualan, laba kotor, dan produk terlaris',customers:'Pelanggan dan poin loyalitas',shift:'Kas laci, kas masuk/keluar, dan tutup shift',settings:'Profil toko, pajak, pengguna, dan data'};
+const SUBS={finance:'Kas Drawer & Dompet, jurnal kas, dan rekap penjualan',pos:'Pilih menu, atur pesanan, lalu terima pembayaran',sales:'Riwayat struk dan pembatalan transaksi',menu:'Menu, resep, bahan baku, dan stok',reports:'Penjualan, laba kotor, dan produk terlaris',customers:'Pelanggan dan poin loyalitas',shift:'Kas laci, kas masuk/keluar, dan tutup shift',settings:'Profil toko, pajak, pengguna, dan data'};
 
 function loginHTML(){
   const L=S.login,u=L.uid?userById(L.uid):null;
@@ -808,7 +813,8 @@ function updatePOS(){
 }
 function openShiftCard(){
   const last=db.shifts.filter(s=>s.closeTs).sort((a,b)=>b.closeTs-a.closeTs)[0];
-  return '<div class="card center-card">'+mark('mark-lg')+'<h2>Buka shift untuk mulai berjualan</h2><p class="muted">Hitung uang tunai di laci kasir, lalu masukkan sebagai kas awal.</p><div class="fld" style="width:100%"><label class="lbl" for="oc">Kas awal</label><input class="in" id="oc" inputmode="numeric" value="'+(last?500000:500000)+'"></div><button class="btn primary" data-act="open-shift">Buka shift</button></div>';
+  const kb=cashOn()&&db.cashLog.length?cashBal().drawer:null;
+  return '<div class="card center-card">'+mark('mark-lg')+'<h2>Buka shift untuk mulai berjualan</h2><p class="muted">Hitung uang tunai di Drawer (laci kasir), lalu masukkan sebagai kas awal.'+(kb!=null?' Menurut catatan, Drawer berisi '+rp(kb)+'.':'')+'</p><div class="fld" style="width:100%"><label class="lbl" for="oc">Kas awal</label><input class="in" id="oc" inputmode="numeric" value="'+(kb!=null?kb:(last?500000:500000))+'"></div><button class="btn primary" data-act="open-shift">Buka shift</button></div>';
 }
 VIEWS.pos=function(){
   if(!curShift())return openShiftCard();
@@ -861,7 +867,9 @@ function completeSale(){
   Object.keys(use).forEach(id=>{const g=ingById(id);if(g){g.stock=Math.round((g.stock-use[id])*1000)/1000;logIng(id,'sale',-use[id],no)}});
   const cu=sale.customerId?custById(sale.customerId):null;
   if(cu){sale.points=Math.floor(T.total/st.pointsPer);cu.points+=sale.points}
-  db.sales.push(sale);save();
+  db.sales.push(sale);
+  if(sale.method==='cash'&&cashOn()){const mv=cashIn(sale.total,'Penjualan '+sale.no,{ref:sale.id});if(mv)setTimeout(()=>toast('Drawer lebih dari '+rp(drawerLimit())+': '+rp(mv)+' dipindah ke Dompet'),2600)}
+  save();
   S.pos=Object.assign(freshPos(),{cat:S.pos.cat,q:S.pos.q});S.pay=null;
   render();showReceipt(sale,true);autoPrint(sale);
 }
@@ -944,6 +952,7 @@ function voidGo(id){
   const back={};s.items.forEach(i=>(i.rec||[]).forEach(r=>{back[r.iid]=(back[r.iid]||0)+r.qty*i.qty}));
   Object.keys(back).forEach(id=>{const g=ingById(id);if(g){g.stock=Math.round((g.stock+back[id])*1000)/1000;logIng(id,'void',back[id],s.no)}});
   const cu=s.customerId?custById(s.customerId):null;if(cu)cu.points=Math.max(0,cu.points-(s.points||0));
+  if(s.method==='cash'&&cashOn())cashOut(s.total,'Pembatalan '+s.no,{ref:s.id});
   save();closeModal();render();toast('Transaksi dibatalkan');
 }
 
@@ -1069,6 +1078,34 @@ function shiftStats(sh){
   const inn=sh.moves.filter(m=>m.type==='in').reduce((a,m)=>a+m.amount,0),out=sh.moves.filter(m=>m.type==='out').reduce((a,m)=>a+m.amount,0);
   return{ss,cash,total:ss.reduce((a,s)=>a+s.total,0),inn,out,expected:sh.openCash+cash+inn-out};
 }
+/* ========== kas tunai: Drawer (tunai masuk) & Dompet (tunai keluar) ==========
+   Aturan: tunai masuk -> Drawer. Bila Drawer melebihi batas (bawaan Rp 200.000), kelebihannya
+   otomatis dipindah ke Dompet. Tunai keluar diambil dari Dompet; bila Dompet habis, sisanya dari Drawer.
+   Semua gerakan tercatat di db.cashLog seperti jurnal: {akun, jenis: debit (masuk) / kredit (keluar), jumlah, ket, foto}. */
+const AKUN={drawer:'Drawer',dompet:'Dompet'};
+const drawerLimit=()=>+db.settings.drawerLimit>0?+db.settings.drawerLimit:200000;
+function cashBal(until){const b={drawer:0,dompet:0};(db.cashLog||[]).forEach(e=>{if(until!=null&&e.ts>until)return;if(b[e.akun]!==undefined)b[e.akun]+=(e.jenis==='debit'?1:-1)*(+e.jumlah||0)});return b}
+function cashEntry(akun,jenis,jumlah,ket,o){
+  jumlah=Math.round(+jumlah||0);if(jumlah<=0)return null;
+  const e=Object.assign({id:uid(),ts:Date.now(),akun,jenis,jumlah,ket:ket||'',foto:'',userId:S.user?S.user.id:null},o||{});
+  if(!Array.isArray(db.cashLog))db.cashLog=[];db.cashLog.push(e);return e;
+}
+function cashOverflow(){
+  const lim=drawerLimit(),lebih=cashBal().drawer-lim;if(lebih<=0)return 0;const g=uid();
+  cashEntry('drawer','kredit',lebih,'Pindah otomatis ke Dompet (Drawer lebih dari '+rp(lim)+')',{auto:1,grp:g});
+  cashEntry('dompet','debit',lebih,'Pindahan otomatis dari Drawer',{auto:1,grp:g});
+  return lebih;
+}
+function cashIn(jumlah,ket,o){cashEntry('drawer','debit',jumlah,ket,o);return cashOverflow()}
+function cashOut(jumlah,ket,o){
+  jumlah=Math.round(+jumlah||0);const b=cashBal(),dari=Math.min(Math.max(0,b.dompet),jumlah),sisa=jumlah-dari,g=uid();
+  if(dari>0)cashEntry('dompet','kredit',dari,ket,Object.assign({grp:g},o||{}));
+  if(sisa>0)cashEntry('drawer','kredit',sisa,ket+(dari>0?' (sisa dari Drawer)':''),Object.assign({grp:g},o||{}));
+  return {dompet:dari,drawer:sisa};
+}
+const cashOn=()=>Array.isArray(db.cashLog);
+const fotoHref=u=>/^files\//.test(u)?u+(u.includes('?')?'&':'?')+'code='+encodeURIComponent(fileCode()):u;
+
 /* ---- rekap shift (format laporan untuk dicetak / dikirim ke WhatsApp) ---- */
 const MON_EN=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function rangeTxt(a,b){
@@ -1085,7 +1122,7 @@ function shiftRecap(sh){
   const items=Object.entries(prod).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
   const nonCash=Object.keys(byM).filter(k=>k!=='cash').reduce((a,k)=>a+byM[k],0);
   const kas=sh.openCash+x.inn-x.out,sysTotal=x.total+kas,closed=!!sh.closeTs;
-  const actCash=closed?sh.closeCash:null,actTotal=closed?actCash+nonCash:null;
+  const actCash=closed?sh.closeCash+(sh.dompetOpen!=null&&sh.dompetClose!=null?sh.dompetClose-sh.dompetOpen:0):null,actTotal=closed?actCash+nonCash:null;
   return {sh,x,items,qty:items.reduce((a,i)=>a+i[1],0),byM,nonCash,kas,sysTotal,actCash,actTotal,diff:closed?actTotal-sysTotal:null,closed,start:sh.openTs,end:sh.closeTs||Date.now()};
 }
 /* baris rekap: {t, b} — b = tebal. Dipakai untuk teks WhatsApp, tampilan, dan cetak. */
@@ -1142,6 +1179,105 @@ ACT['shift-recap']=el=>{const sh=db.shifts.find(x=>x.id===el.dataset.id)||curShi
 ACT['recap-copy']=()=>{const sh=recapShift();if(sh)copyText(recapText(shiftRecap(sh)))};
 ACT['recap-share']=()=>{const sh=recapShift();if(!sh)return;navigator.share({title:'Rekap shift',text:recapText(shiftRecap(sh))}).catch(()=>{})};
 ACT['recap-print']=()=>{const sh=recapShift();if(sh)printRecap(shiftRecap(sh))};
+/* ========== halaman Keuangan ========== */
+function fotoFieldHTML(){
+  const up=SG.mode==='local'&&syncOn();
+  return '<div class="fld"><label class="lbl" for="fin-foto">Foto struk (link gambar, opsional)</label><input class="in" id="fin-foto" placeholder="https://… atau files/gambar/struk.jpg">'
+   +(up?'<input type="file" id="fin-foto-f" accept="image/*" capture="environment" data-ch="fin-foto" style="display:none"><button class="btn sm ghost" type="button" data-act="fin-foto-pick" style="align-self:flex-start;margin-top:4px">'+ico('plus')+'Ambil / unggah foto struk</button>':'')+'</div>';
+}
+function fotoVal(){const el=$('#fin-foto');if(!el)return '';const v=el.value.trim();if(v&&!urlOk(v)){toast('Link foto tidak valid. Pakai https://… atau files/gambar/…');return false}return v}
+ACT['fin-foto-pick']=()=>{const i=$('#fin-foto-f');if(i)i.click()};
+CH['fin-foto']=async el=>{
+  const f=el.files[0];if(!f)return;toast('Mengunggah foto…');
+  try{const r=await fetch('api/files?folder=gambar&name='+encodeURIComponent('struk-'+new Date().toISOString().slice(0,10)+'-'+f.name),{method:'POST',headers:{'x-store-code':fileCode()},body:f});const j=await r.json();if(!r.ok)throw 0;$('#fin-foto').value='files/gambar/'+j.name;toast('Foto tersimpan di server')}
+  catch(e){toast('Gagal mengunggah foto')}el.value='';
+};
+const DAY_EN=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+function kasLines(ts){
+  const d=new Date(ts),b=cashBal(ts),p=n=>String(n).padStart(2,'0');
+  return [{t:DAY_EN[d.getDay()]+' : '+p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()},{t:'Uang di Drawer :'},{t:rpRekap(b.drawer)},{t:''},{t:'Uang di Dompet :'},{t:rpRekap(b.dompet)}];
+}
+function finRange(r){const t=sod(Date.now());return r==='today'?[t,addDays(t,1)]:r==='yesterday'?[addDays(t,-1),t]:r==='7d'?[addDays(t,-6),addDays(t,1)]:r==='month'?[new Date(new Date().getFullYear(),new Date().getMonth(),1).getTime(),addDays(t,1)]:[0,Infinity]}
+VIEWS.finance=function(){
+  const F=S.fin||(S.fin={range:'today',akun:'all'}),b=cashBal(),lim=drawerLimit(),log=db.cashLog||[];
+  const sorted=log.slice().sort((a,x)=>a.ts-x.ts),run={drawer:0,dompet:0},saldo={};
+  sorted.forEach(e=>{if(run[e.akun]===undefined)return;run[e.akun]+=(e.jenis==='debit'?1:-1)*e.jumlah;saldo[e.id]=run[e.akun]});
+  const [a,z]=finRange(F.range),rows=sorted.filter(e=>e.ts>=a&&e.ts<z&&(F.akun==='all'||e.akun===F.akun)).reverse();
+  const sum=(ak,j)=>rows.filter(e=>e.akun===ak&&e.jenis===j).reduce((t,e)=>t+e.jumlah,0);
+  const tr=rows.slice(0,300).map(e=>{const u=userById(e.userId);return '<tr><td><b>'+fmtDate(e.ts)+'</b><div class="sub">'+fmtTime(e.ts)+(u?' · '+esc(u.name):'')+'</div></td><td><span class="pill '+(e.akun==='drawer'?'amber':'')+'">'+AKUN[e.akun]+'</span></td><td class="r num" style="color:var(--ok)">'+(e.jenis==='debit'?rp(e.jumlah):'')+'</td><td class="r num" style="color:var(--bad)">'+(e.jenis==='kredit'?rp(e.jumlah):'')+'</td><td>'+esc(e.ket)+(e.auto?' <span class="pill">otomatis</span>':'')+'</td><td>'+(e.foto?'<a class="btn sm ghost" href="'+esc(fotoHref(e.foto))+'" target="_blank" rel="noopener">Lihat</a>':'<span class="muted">-</span>')+'</td><td class="r num"><b>'+rp(saldo[e.id])+'</b></td></tr>'}).join('');
+  const ranges=[['today','Hari ini'],['yesterday','Kemarin'],['7d','7 hari'],['month','Bulan ini'],['all','Semua']];
+  const sh=curShift(),shifts=db.shifts.filter(x=>x.closeTs).sort((p,q)=>q.closeTs-p.closeTs).slice(0,6);
+  const recRows=(sh?[sh]:[]).concat(shifts).map(x=>{const u=userById(x.userId),st=shiftStats(x);return '<div class="list-row"><div class="l"><b>'+fmtDate(x.openTs)+' · '+fmtTime(x.openTs)+' – '+(x.closeTs?fmtTime(x.closeTs):'berjalan')+'</b><span class="muted">'+esc(u?u.name:'-')+' · penjualan '+rp(st.total)+'</span></div><button class="btn sm ghost" data-act="shift-recap" data-id="'+x.id+'">Rekap</button></div>'}).join('');
+  return (log.length?'':'<div class="banner"><span><b>Mulai pencatatan kas.</b> Isi saldo awal uang di Drawer dan Dompet. Setelah itu penjualan tunai, kas masuk/keluar, dan pembatalan tercatat otomatis.</span><button class="btn sm primary" data-act="fin-adj">Isi saldo awal</button></div>')
+   +'<div class="kpis"><div class="kpi hero"><span class="lbl">Uang di Drawer</span><span class="v">'+rp(b.drawer)+'</span><span class="muted" style="font-size:12px">Batas '+rp(lim)+' · lebihnya otomatis ke Dompet</span></div><div class="kpi"><span class="lbl">Uang di Dompet</span><span class="v">'+rp(b.dompet)+'</span><span class="muted" style="font-size:12px">Sumber tunai keluar</span></div><div class="kpi"><span class="lbl">Total kas tunai</span><span class="v">'+rp(b.drawer+b.dompet)+'</span></div></div>'
+   +'<div class="toolbar"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="fin-out">'+ico('wallet')+'Catat pengeluaran</button><button class="btn ghost" data-act="fin-in">'+ico('plus')+'Catat pemasukan</button><button class="btn ghost" data-act="fin-move">Pindah kas</button><button class="btn ghost" data-act="fin-adj">Penyesuaian saldo</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn dark" data-act="fin-print">'+ico('receipt')+'Rekap kas</button><button class="btn ghost" data-act="fin-limit">Batas Drawer</button></div></div>'
+   +'<div class="card flush"><div class="card-h" style="padding:16px 18px 0;flex-wrap:wrap;gap:10px"><h3>Jurnal kas tunai</h3><div class="chips">'+ranges.map(r=>chip('fin-range',r[0],r[1],F.range)).join('')+'</div><select class="sel" data-ch="fin-akun" aria-label="Filter kas" style="width:auto;flex:0 0 auto"><option value="all"'+(F.akun==='all'?' selected':'')+'>Drawer & Dompet</option><option value="drawer"'+(F.akun==='drawer'?' selected':'')+'>Drawer</option><option value="dompet"'+(F.akun==='dompet'?' selected':'')+'>Dompet</option></select><button class="btn sm ghost" data-act="fin-csv">'+ico('copy')+'Salin CSV</button></div>'
+   +'<p class="muted" style="padding:6px 18px 0;margin:0;font-size:12px">Periode ini: Drawer +'+rp(sum('drawer','debit'))+' / −'+rp(sum('drawer','kredit'))+' · Dompet +'+rp(sum('dompet','debit'))+' / −'+rp(sum('dompet','kredit'))+'</p>'
+   +(tr?'<div class="tablewrap"><table style="min-width:860px"><thead><tr><th>Tanggal</th><th>Kas</th><th class="r">Debit (masuk)</th><th class="r">Kredit (keluar)</th><th>Keterangan</th><th>Foto struk</th><th class="r">Saldo</th></tr></thead><tbody>'+tr+'</tbody></table></div>':'<p class="muted" style="padding:18px">Belum ada catatan kas pada periode ini.</p>')+'</div>'
+   +'<div class="card"><div class="card-h"><h3>Rekap penjualan per shift</h3><span class="muted">Siap cetak & kirim WhatsApp</span></div>'+(recRows||'<p class="muted">Belum ada shift.</p>')+'</div>';
+};
+ACT['fin-range']=el=>{S.fin.range=el.dataset.v;render()};
+CH['fin-akun']=el=>{S.fin.akun=el.value;render()};
+function finForm(title,body,act){modal({title,body:'<div class="form">'+body+'</div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="'+act+'">Simpan</button>'})}
+const amtFld=(id,l,v)=>'<div class="fld"><label class="lbl" for="'+id+'">'+l+'</label><input class="in" id="'+id+'" inputmode="numeric" value="'+(v!=null?v:'')+'" placeholder="0"></div>';
+const ketFld=ph=>'<div class="fld"><label class="lbl" for="fin-ket">Keterangan</label><input class="in" id="fin-ket" placeholder="'+esc(ph)+'"></div>';
+ACT['fin-out']=()=>finForm('Catat pengeluaran',amtFld('fin-amt','Jumlah')+ketFld('Contoh: Beli susu 2 liter')+fotoFieldHTML()+'<p class="muted" style="margin:0">Diambil dari Dompet (saldo '+rp(Math.max(0,cashBal().dompet))+'). Bila Dompet kurang, sisanya dari Drawer.'+(curShift()?' Tercatat juga sebagai kas keluar shift berjalan.':'')+'</p>','fin-out-go');
+ACT['fin-in']=()=>finForm('Catat pemasukan',amtFld('fin-amt','Jumlah')+ketFld('Contoh: Tambah modal kembalian')+fotoFieldHTML()+'<p class="muted" style="margin:0">Masuk ke Drawer. Bila Drawer melebihi '+rp(drawerLimit())+', kelebihannya otomatis ke Dompet.</p>','fin-in-go');
+function finSave(type){
+  const a=num($('#fin-amt').value);if(a<=0){toast('Isi jumlah lebih dari 0');return}
+  const ket=$('#fin-ket').value.trim(),foto=fotoVal();if(foto===false)return;
+  const sh=curShift(),mv=sh?{id:uid(),ts:Date.now(),type,amount:a,note:ket}:null;if(mv)sh.moves.push(mv);
+  let msg='Tersimpan';
+  if(type==='in'){const o=cashIn(a,ket||'Pemasukan tunai',{ref:mv&&mv.id,foto});if(o)msg='Tersimpan. '+rp(o)+' dipindah otomatis ke Dompet'}
+  else{const r=cashOut(a,ket||'Pengeluaran tunai',{ref:mv&&mv.id,foto});msg='Tersimpan. Diambil dari '+(r.dompet&&r.drawer?'Dompet '+rp(r.dompet)+' + Drawer '+rp(r.drawer):r.dompet?'Dompet':'Drawer');if(cashBal().drawer<0)msg+='. Perhatian: saldo Drawer minus, periksa catatan'}
+  save();closeModal();render();toast(msg);
+}
+ACT['fin-out-go']=()=>finSave('out');
+ACT['fin-in-go']=()=>finSave('in');
+ACT['fin-move']=()=>finForm('Pindah kas','<div class="fld"><label class="lbl" for="fin-dir">Arah</label><select class="sel" id="fin-dir"><option value="dompet">Dompet → Drawer (mis. tambah uang kembalian)</option><option value="drawer">Drawer → Dompet</option></select></div>'+amtFld('fin-amt','Jumlah')+ketFld('Contoh: Tukar uang kembalian'),'fin-move-go');
+ACT['fin-move-go']=()=>{
+  const a=num($('#fin-amt').value);if(a<=0){toast('Isi jumlah lebih dari 0');return}
+  const from=$('#fin-dir').value,to=from==='dompet'?'drawer':'dompet',ket=$('#fin-ket').value.trim(),g=uid();
+  cashEntry(from,'kredit',a,(ket||'Pindah kas')+' → '+AKUN[to],{grp:g});cashEntry(to,'debit',a,(ket||'Pindah kas')+' dari '+AKUN[from],{grp:g});
+  save();closeModal();render();toast('Kas dipindah');
+};
+ACT['fin-adj']=()=>{const b=cashBal(),first=!(db.cashLog||[]).length;finForm(first?'Isi saldo awal':'Penyesuaian saldo',(first?'<p class="muted" style="margin:0">Hitung uang yang ada sekarang.</p>':'<p class="muted" style="margin:0">Isi hasil hitung uang yang sebenarnya. Selisih dengan catatan dibukukan sebagai penyesuaian.</p>')+amtFld('fin-d','Uang di Drawer',first?'':b.drawer)+amtFld('fin-w','Uang di Dompet',first?'':b.dompet),'fin-adj-go')};
+ACT['fin-adj-go']=()=>{
+  const b=cashBal(),first=!db.cashLog.length,ket=first?'Saldo awal':'Penyesuaian saldo (hitung ulang)';
+  [['drawer','#fin-d'],['dompet','#fin-w']].forEach(([ak,id])=>{const v=$(id).value.trim();if(v==='')return;const d=num(v)-b[ak];if(d)cashEntry(ak,d>0?'debit':'kredit',Math.abs(d),ket)});
+  save();closeModal();render();toast('Saldo disimpan');
+};
+ACT['fin-limit']=()=>finForm('Batas uang di Drawer',amtFld('fin-lim','Batas',drawerLimit())+'<p class="muted" style="margin:0">Bila uang di Drawer melebihi batas setelah ada tunai masuk, kelebihannya otomatis dipindah ke Dompet.</p>','fin-limit-go');
+ACT['fin-limit-go']=()=>{const v=num($('#fin-lim').value);if(v<=0){toast('Isi batas lebih dari 0');return}db.settings.drawerLimit=v;const o=cashOverflow();save();closeModal();render();toast('Batas Drawer '+rp(v)+(o?'. '+rp(o)+' dipindah ke Dompet':''))};
+ACT['fin-csv']=()=>{
+  const q=v=>'"'+String(v==null?'':v).replace(/"/g,'""')+'"',F=S.fin,[a,z]=finRange(F.range);
+  const sorted=(db.cashLog||[]).slice().sort((p,x)=>p.ts-x.ts),run={drawer:0,dompet:0},out=[['Tanggal','Jam','Kas','Debit','Kredit','Keterangan','Foto','Saldo'].map(q).join(',')];
+  sorted.forEach(e=>{run[e.akun]+=(e.jenis==='debit'?1:-1)*e.jumlah;if(e.ts>=a&&e.ts<z&&(F.akun==='all'||e.akun===F.akun))out.push([fmtDate(e.ts),fmtTime(e.ts),AKUN[e.akun],e.jenis==='debit'?e.jumlah:'',e.jenis==='kredit'?e.jumlah:'',e.ket,e.foto,run[e.akun]].map(q).join(','))});
+  copyText(out.join('\n'));
+};
+/* rekap kas: Tuesday : 27/10/2026, Uang di Drawer, Uang di Dompet */
+ACT['fin-print']=()=>{
+  const today=new Date(),p=n=>String(n).padStart(2,'0'),iso=today.getFullYear()+'-'+p(today.getMonth()+1)+'-'+p(today.getDate());
+  S.kasTs=Date.now();
+  modal({title:'Rekap kas',body:'<div class="fld"><label class="lbl" for="kas-date">Tanggal</label><input class="in" type="date" id="kas-date" data-ch="kas-date" value="'+iso+'" max="'+iso+'"></div><div class="rk" id="kas-view">'+kasViewHTML()+'</div><p class="muted" style="margin-top:8px">Saldo hari ini dihitung sampai saat ini; tanggal lalu dihitung sampai akhir hari itu.</p>',
+    foot:'<button class="btn ghost" data-act="kas-copy">'+ico('copy')+'Salin teks</button>'+(navigator.share?'<button class="btn ghost" data-act="kas-share">Bagikan</button>':'')+'<button class="btn primary" data-act="kas-printgo">'+ico('receipt')+'Cetak</button>'});
+};
+const kasViewHTML=()=>kasLines(S.kasTs).map(l=>l.t?'<div>'+esc(l.t)+'</div>':'<div class="rk-e"></div>').join('');
+CH['kas-date']=el=>{const v=el.value;if(!v)return;const [y,m,d]=v.split('-').map(Number),end=new Date(y,m-1,d,23,59,59,999).getTime();S.kasTs=Math.min(end,Date.now());$('#kas-view').innerHTML=kasViewHTML()};
+const kasText=()=>kasLines(S.kasTs).map(l=>l.t).join('\n');
+ACT['kas-copy']=()=>copyText(kasText());
+ACT['kas-share']=()=>navigator.share({title:'Rekap kas',text:kasText()}).catch(()=>{});
+ACT['kas-printgo']=async()=>{
+  const cfg=printerCfg(),cols=cfg.paper===80?48:32,st=db.settings,name=asc(st.storeName),SEP='-'.repeat(cols);
+  const lines=[Object.assign({t:name,a:'c',b:1},name.length<=Math.floor(cols/2)?{sz:2}:{}),{t:'REKAP KAS TUNAI',a:'c',b:1},{t:SEP,a:'l'}];
+  kasLines(S.kasTs).forEach(l=>lines.push({t:asc(l.t),a:'l',b:/^Rp\./.test(l.t)?1:0}));
+  lines.push({t:SEP,a:'l'},{t:asc('Dicetak '+fmtDT(Date.now())),a:'c'});
+  try{
+    if(cfg.mode==='off'||cfg.mode==='system'){sysPrint(lines,cfg);return}
+    const bytes=encodeEscpos(lines,cfg);if(cfg.mode==='rawbt'){rawbtSend(bytes);return}
+    if(!PR.ch)await bleConnect(false);await bleWrite(bytes);toast('Rekap kas dicetak');
+  }catch(e){toast(printErr(e))}
+};
 VIEWS.shift=function(){
   const sh=curShift();let cur;
   if(!sh)cur=openShiftCard();
@@ -1157,11 +1293,12 @@ VIEWS.shift=function(){
   return cur+'<div class="card flush"><div style="padding:16px 18px 0"><h3>Riwayat shift</h3></div>'+(hist?'<div class="tablewrap"><table style="min-width:790px"><thead><tr><th>Tanggal</th><th>Kasir</th><th class="r">Kas awal</th><th class="r">Penjualan</th><th class="r">Seharusnya</th><th class="r">Dihitung</th><th>Selisih</th><th class="r">Laporan</th></tr></thead><tbody>'+hist+'</tbody></table></div>':empty('Belum ada shift yang ditutup','Riwayat muncul setelah shift pertama ditutup.'))+'</div>';
 };
 function cashMove(type){
-  modal({title:type==='in'?'Kas masuk':'Kas keluar',body:'<div class="form"><div class="fld"><label class="lbl" for="cm-amt">Jumlah</label><input class="in" id="cm-amt" inputmode="numeric"></div><div class="fld"><label class="lbl" for="cm-note">Keterangan</label><input class="in" id="cm-note" placeholder="'+(type==='in'?'Contoh: Tambah uang kembalian':'Contoh: Beli es batu')+'"></div></div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="cash-save" data-v="'+type+'">Simpan</button>'});
+  modal({title:type==='in'?'Kas masuk':'Kas keluar',body:'<div class="form"><div class="fld"><label class="lbl" for="cm-amt">Jumlah</label><input class="in" id="cm-amt" inputmode="numeric"></div><div class="fld"><label class="lbl" for="cm-note">Keterangan</label><input class="in" id="cm-note" placeholder="'+(type==='in'?'Contoh: Tambah uang kembalian':'Contoh: Beli es batu')+'"></div>'+fotoFieldHTML()+'<p class="muted" style="margin:0">'+(type==='in'?'Masuk ke Drawer.':'Diambil dari Dompet (saldo '+rp(Math.max(0,cashBal().dompet))+'); bila kurang, sisanya dari Drawer.')+'</p></div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="cash-save" data-v="'+type+'">Simpan</button>'});
 }
+const shiftExpected=(sh,x)=>sh.dompetOpen!=null&&cashOn()?cashBal().drawer:x.expected;
 function shiftCloseModal(){
-  const sh=curShift(),x=shiftStats(sh);
-  modal({title:'Tutup shift',body:'<div class="kpis"><div class="kpi"><span class="lbl">Total penjualan</span><span class="v">'+rp(x.total)+'</span></div><div class="kpi hero"><span class="lbl">Kas seharusnya</span><span class="v">'+rp(x.expected)+'</span></div></div><div class="fld"><label class="lbl" for="sc-cash">Uang tunai di laci (hasil hitung)</label><input class="in" id="sc-cash" data-in="sc-cash" inputmode="numeric" placeholder="0"></div><div class="change-box"><span class="lbl">Selisih</span><b id="sc-diff">—</b></div><div class="fld"><label class="lbl" for="sc-note">Catatan</label><input class="in" id="sc-note"></div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn dark" data-act="shift-close-go">Tutup shift</button>'});
+  const sh=curShift(),x=Object.assign({},shiftStats(sh));x.expected=shiftExpected(sh,x);const dmp=sh.dompetOpen!=null&&cashOn();
+  modal({title:'Tutup shift',body:'<div class="kpis"><div class="kpi"><span class="lbl">Total penjualan</span><span class="v">'+rp(x.total)+'</span></div><div class="kpi hero"><span class="lbl">'+(dmp?'Uang di Drawer seharusnya':'Kas seharusnya')+'</span><span class="v">'+rp(x.expected)+'</span></div>'+(dmp?'<div class="kpi"><span class="lbl">Uang di Dompet</span><span class="v">'+rp(cashBal().dompet)+'</span></div>':'')+'</div><div class="fld"><label class="lbl" for="sc-cash">Uang tunai di '+(dmp?'Drawer':'laci')+' (hasil hitung)</label><input class="in" id="sc-cash" data-in="sc-cash" inputmode="numeric" placeholder="0"></div><div class="change-box"><span class="lbl">Selisih</span><b id="sc-diff">—</b></div><div class="fld"><label class="lbl" for="sc-note">Catatan</label><input class="in" id="sc-note"></div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn dark" data-act="shift-close-go">Tutup shift</button>'});
 }
 
 /* ========== pengaturan ========== */
@@ -1692,25 +1829,31 @@ ACT.pin=el=>{
 };
 /* shift */
 ACT['open-shift']=()=>{
-  db.shifts.push({id:uid(),userId:S.user.id,openTs:Date.now(),openCash:Math.max(0,num($('#oc').value)),closeTs:null,closeCash:null,expectedCash:null,diff:null,note:'',moves:[]});
+  const oc=Math.max(0,num($('#oc').value)),sh={id:uid(),userId:S.user.id,openTs:Date.now(),openCash:oc,closeTs:null,closeCash:null,expectedCash:null,diff:null,note:'',moves:[]};
+  if(cashOn()){const d=oc-cashBal().drawer,first=!db.cashLog.length;if(d)cashEntry('drawer',d>0?'debit':'kredit',Math.abs(d),first?'Saldo awal Drawer (buka shift)':'Penyesuaian kas awal shift',{ref:sh.id});sh.dompetOpen=cashBal().dompet}
+  db.shifts.push(sh);
   save();render();toast('Shift dibuka');
 };
 ACT['cash-in']=()=>cashMove('in');
 ACT['cash-out']=()=>cashMove('out');
 ACT['cash-save']=el=>{
   const a=num($('#cm-amt').value);if(a<=0){toast('Isi jumlah lebih dari 0');return}
-  curShift().moves.push({ts:Date.now(),type:el.dataset.v,amount:a,note:$('#cm-note').value.trim()});
-  save();closeModal();render();toast('Tersimpan');
+  const note=$('#cm-note').value.trim(),foto=fotoVal();if(foto===false)return;
+  const mv={id:uid(),ts:Date.now(),type:el.dataset.v,amount:a,note};curShift().moves.push(mv);
+  let msg='Tersimpan';
+  if(cashOn()){if(mv.type==='in'){const o=cashIn(a,'Kas masuk'+(note?': '+note:''),{ref:mv.id,foto});if(o)msg='Tersimpan. '+rp(o)+' dipindah otomatis ke Dompet'}else{const r=cashOut(a,note||'Kas keluar',{ref:mv.id,foto});msg='Tersimpan. Diambil dari '+(r.dompet&&r.drawer?'Dompet '+rp(r.dompet)+' + Drawer '+rp(r.drawer):r.dompet?'Dompet':'Drawer')}}
+  save();closeModal();render();toast(msg);
 };
 ACT['shift-close']=()=>{if(db.held.length){toast('Masih ada '+db.held.length+' pesanan tersimpan. Selesaikan atau hapus dulu.');return}shiftCloseModal()};
 INP['sc-cash']=el=>{
-  const x=shiftStats(curShift()),d=num(el.value)-x.expected,o=$('#sc-diff');
+  const sh=curShift(),d=num(el.value)-shiftExpected(sh,shiftStats(sh)),o=$('#sc-diff');
   o.textContent=el.value.trim()===''?'—':(d===0?'Cocok':(d>0?'Lebih ':'Kurang ')+rp(Math.abs(d)));
 };
 ACT['shift-close-go']=()=>{
   const v=$('#sc-cash').value;if(v.trim()===''){toast('Isi uang tunai hasil hitung');return}
-  const sh=curShift(),x=shiftStats(sh),c=num(v);
-  Object.assign(sh,{closeTs:Date.now(),closeCash:c,expectedCash:x.expected,diff:c-x.expected,note:$('#sc-note').value.trim()});
+  const sh=curShift(),x=shiftStats(sh),c=num(v),exp=shiftExpected(sh,x);
+  Object.assign(sh,{closeTs:Date.now(),closeCash:c,expectedCash:exp,diff:c-exp,note:$('#sc-note').value.trim()});
+  if(sh.dompetOpen!=null&&cashOn()){sh.dompetClose=cashBal().dompet;if(c!==exp)cashEntry('drawer',c>exp?'debit':'kredit',Math.abs(c-exp),'Selisih hitung tutup shift ('+(c>exp?'lebih':'kurang')+')',{ref:sh.id})}
   save();closeModal();render();toast('Shift ditutup');recapModal(sh);
 };
 /* kasir */
@@ -1866,7 +2009,7 @@ ACT['restore-go']=()=>{
   snapshotNow('Sebelum pemulihan berkas');db=d;migrate(db);save();resetPos();if(S.user&&!userById(S.user.id)){logout();return}if(S.user)S.user=userById(S.user.id);closeModal();render();toast('Data dipulihkan');
 };
 ACT['clear-demo']=()=>confirmBox('Hapus data contoh','Semua transaksi, shift, pelanggan, dan riwayat stok dihapus. Produk, pengguna, dan pengaturan tetap ada. Stok tidak berubah.','Hapus data',()=>{
-  snapshotNow('Sebelum hapus data contoh');Object.assign(db,{sales:[],shifts:[],customers:[],stockLog:[],ingLog:[],held:[],demo:false});db.seq.sale=0;save();resetPos();render();toast('Data contoh dihapus. Buka shift untuk mulai.');
+  snapshotNow('Sebelum hapus data contoh');Object.assign(db,{cashLog:[],sales:[],shifts:[],customers:[],stockLog:[],ingLog:[],held:[],demo:false});db.seq.sale=0;save();resetPos();render();toast('Data contoh dihapus. Buka shift untuk mulai.');
 });
 ACT['reset-demo']=()=>confirmBox('Reset ke data contoh','Semua data saat ini diganti dengan data contoh Soan Kofe.','Reset',()=>{
   snapshotNow('Sebelum reset ke data contoh');db=seed();save();resetPos();S.user=userById(S.user.id)||db.users[0];render();toast('Data contoh dimuat');
@@ -1887,7 +2030,7 @@ document.addEventListener('keydown',e=>{
    {k, j, del, u, dev}. Perangkat hanya mengirim data yang berubah dan hanya mengambil perubahan
    sejak sinkron terakhir, jadi tetap jalan saat koneksi ke server putus. */
 const SYNC_KEY='soankofe.pos.sync',SYNC_BASE='soankofe.pos.syncbase';
-const SYNC_COLLS=['users','categories','products','customers','sales','held','stockLog','ingredients','ingLog','shifts'];
+const SYNC_COLLS=['users','categories','products','customers','sales','held','stockLog','ingredients','ingLog','shifts','cashLog'];
 const SG={info:null,cfg:null,base:{},api:null,mode:null,unsub:null,state:'off',err:'',lastOk:0,timer:null,rTimer:null,retry:null,started:false,files:null};
 function syncCfgLoad(){try{SG.cfg=JSON.parse(lsGet(SYNC_KEY)||'null')}catch(e){SG.cfg=null}try{SG.base=JSON.parse(lsGet(SYNC_BASE)||'{}')||{}}catch(e){SG.base={}}}
 function syncCfgSave(){lsSet(SYNC_KEY,JSON.stringify(SG.cfg))}
@@ -2039,7 +2182,7 @@ ACT['sync-go']=async el=>{
           const all=await SG.api.getAll();
           snapshotNow('Sebelum sinkron pertama');
           const keep=db.settings;
-          db={v:2,settings:keep,users:[],categories:[],products:[],customers:[],sales:[],held:[],stockLog:[],ingredients:[],ingLog:[],shifts:[],seq:{sale:0},demo:false};
+          db={v:2,settings:keep,users:[],categories:[],products:[],customers:[],sales:[],held:[],stockLog:[],ingredients:[],ingLog:[],shifts:[],cashLog:[],seq:{sale:0},demo:false};
           SG.base={};let max=0;
           all.forEach(v=>{if(v.u>max)max=v.u;if(!v.del)syncApply(v)});
           migrate(db);if(!db.users.length){db=JSON.parse(lsGet(SNAP_KEY));throw new Error('Data toko di server tidak lengkap')}

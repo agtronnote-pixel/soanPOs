@@ -173,7 +173,7 @@ const CFG_PATH='soan-config.json';
 const K_CONN='soandev.github',K_DRAFT='soandev.draft',K_UI='soandev.ui';
 const ls={get(k){try{return JSON.parse(localStorage.getItem(k)||'null')}catch(e){return null}},set(k,v){try{localStorage.setItem(k,JSON.stringify(v))}catch(e){}},del(k){try{localStorage.removeItem(k)}catch(e){}}};
 
-const MENU={pos:'Kasir',sales:'Transaksi',menu:'Menu & Bahan',reports:'Laporan',customers:'Pelanggan',shift:'Shift',settings:'Pengaturan'};
+const MENU={pos:'Kasir',sales:'Transaksi',menu:'Menu & Bahan',reports:'Laporan',customers:'Pelanggan',shift:'Shift',finance:'Keuangan',settings:'Pengaturan'};
 const TYPES={dine:'Dine in',take:'Take away',delivery:'Delivery'};
 const METHODS={cash:'Tunai',qris:'QRIS',debit:'Debit',transfer:'Transfer'};
 const MTABS={sum:'Ringkasan',menu:'Menu',ing:'Bahan baku',log:'Mutasi stok'};
@@ -181,7 +181,7 @@ const RANGES_S=[['today','Hari ini'],['yesterday','Kemarin'],['7d','7 hari'],['a
 const REPORTS={trend:'Grafik penjualan (per jam / per hari)',top:'Produk terlaris',cats:'Penjualan per kategori',gp:'Laba kotor per menu',use:'Pemakaian bahan baku',hours:'Jam ramai',pay:'Metode pembayaran'};
 const DEFAULT={versi:1,catatan:'Diatur dari Panel Developer (developer/). Boleh diedit manual; nilai yang tidak valid diabaikan.',
   tema:{aksen:'#F2A31B',aksenGelap:'#F5AE2E',sidebar:'#151412',latar:'#F6EFE6'},
-  menu:[{id:'pos',label:'Kasir',tampil:true,kasir:true},{id:'sales',label:'Transaksi',tampil:true,kasir:true},{id:'menu',label:'Menu & Bahan',short:'Menu',tampil:true,kasir:false},{id:'reports',label:'Laporan',tampil:true,kasir:false},{id:'customers',label:'Pelanggan',tampil:true,kasir:true},{id:'shift',label:'Shift',tampil:true,kasir:true},{id:'settings',label:'Pengaturan',tampil:true,kasir:false}],
+  menu:[{id:'pos',label:'Kasir',tampil:true,kasir:true},{id:'sales',label:'Transaksi',tampil:true,kasir:true},{id:'menu',label:'Menu & Bahan',short:'Menu',tampil:true,kasir:false},{id:'reports',label:'Laporan',tampil:true,kasir:false},{id:'customers',label:'Pelanggan',tampil:true,kasir:true},{id:'shift',label:'Shift',tampil:true,kasir:true},{id:'finance',label:'Keuangan',tampil:true,kasir:false},{id:'settings',label:'Pengaturan',tampil:true,kasir:false}],
   kasir:{ukuranKartu:'normal',tipePesanan:Object.keys(TYPES).map(id=>({id,label:TYPES[id],tampil:true})),metodeBayar:Object.keys(METHODS).map(id=>({id,label:METHODS[id],tampil:true}))},
   laporan:Object.keys(REPORTS).map(id=>({id,tampil:true})),laporanRentang:'7d',
   transaksi:{filterAwal:'today'},menuBahan:{tab:Object.keys(MTABS).map(id=>({id,tampil:true}))},
@@ -189,8 +189,8 @@ const DEFAULT={versi:1,catatan:'Diatur dari Panel Developer (developer/). Boleh 
 const PRESETS=[['Soan (asli)','#F2A31B','#F5AE2E','#151412','#F6EFE6'],['Daun','#2F8F5B','#5CC48A','#12261B','#EEF4EE'],['Laut','#2563C9','#6EA2F5','#0F1B2E','#EEF2F8'],['Bata','#C2522D','#F08A66','#24140F','#F7EFE9'],['Anggur','#8B3A8F','#D07FD4','#1E1220','#F5EEF5']];
 const SECS=[['koneksi','Koneksi GitHub','⌁'],['menu','Menu navigasi','☰'],['tampilan','Warna & ukuran','◐'],['teks','Teks login','T'],['berkas','Unggah file kode','⇪'],['riwayat','Riwayat versi','↺']];
 const PNAV=[['Proyek',['koneksi']],['Tampilan umum',['menu','tampilan','teks']],['Halaman POS',null],['Alat',['berkas','riwayat']]];
-const PAGE_ICO={pos:'▦',sales:'▤',menu:'☕',reports:'▥',customers:'☺',shift:'◷',settings:'⚙'};
-const SOON={customers:['Kolom yang tampil (telepon, poin, catatan)','Fitur poin aktif/nonaktif'],shift:['Nominal cepat kas awal','Catatan wajib saat tutup shift','Batas selisih kas yang diberi peringatan'],settings:['Kartu yang tampil (Printer, Data, Sinkron)','Urutan kartu'],sales:['Kolom yang tampil','Izin kasir membatalkan transaksi'],menu:['Informasi di kartu menu (HPP, margin, stok)','Urutan kategori'],pos:[],reports:[]};
+const PAGE_ICO={pos:'▦',sales:'▤',menu:'☕',reports:'▥',customers:'☺',shift:'◷',finance:'¤',settings:'⚙'};
+const SOON={customers:['Kolom yang tampil (telepon, poin, catatan)','Fitur poin aktif/nonaktif'],shift:['Nominal cepat kas awal','Catatan wajib saat tutup shift','Batas selisih kas yang diberi peringatan'],settings:['Kartu yang tampil (Printer, Data, Sinkron)','Urutan kartu'],finance:['Batas uang di Drawer','Kolom jurnal kas yang tampil','Format rekap kas'],sales:['Kolom yang tampil','Izin kasir membatalkan transaksi'],menu:['Informasi di kartu menu (HPP, margin, stok)','Urutan kategori'],pos:[],reports:[]};
 const SEC_ALIAS={kasir:'p:pos',laporan:'p:reports'};
 function posPages(){const l=[];walkMenu(S.cfg.menu,x=>{if(MENU[x.id]||x.jenis==='halaman')l.push(x)});return l}
 function hiddenOf(id){let h=null;const w=(arr,anc)=>arr.forEach(x=>{const hid=anc||x.tampil===false;if(x.id===id)h=hid;if(x.anak)w(x.anak,hid)});w(S.cfg.menu,false);return !!h}
@@ -199,7 +199,7 @@ function secInfo(sec){
   const x=SECS.find(z=>z[0]===sec);return x?[x[1],x[2]]:['Panel','•'];
 }
 const secView=sec=>sec.startsWith('p:')?sec.slice(2):SEC_VIEW[sec];
-const SEC_VIEW={menu:'pos',kasir:'pos',laporan:'reports',tampilan:'pos',teks:'login',koneksi:'pos',berkas:'pos',riwayat:'pos'};
+const SEC_VIEW={finance:'finance',menu:'pos',kasir:'pos',laporan:'reports',tampilan:'pos',teks:'login',koneksi:'pos',berkas:'pos',riwayat:'pos'};
 
 /* ---------- normalisasi: pastikan semua komponen ada & valid ---------- */
 const hexOk=v=>typeof v==='string'&&/^#[0-9a-f]{6}$/i.test(v);
@@ -245,7 +245,7 @@ function normMenu(list){
     if(x.jenis==='tautan'&&/^ln-[\w-]{1,40}$/.test(x.id)){seen.add(x.id);out.push({id:x.id,jenis:'tautan',label:lbl(x,'Tautan'),url:typeof x.url==='string'?x.url:'',tampil:tp,kasir:x.kasir!==false})}
   });return out};
   let top=walk(list,1);
-  Object.keys(MENU).forEach(id=>{if(!seen.has(id))top.push(clone(DM[id]))});
+  Object.keys(MENU).forEach(id=>{if(seen.has(id))return;const si=top.findIndex(x=>x.id==='settings');if(si>=0)top.splice(si,0,clone(DM[id]));else top.push(clone(DM[id]))});
   const pull=[];
   const ext=arr=>arr.filter(y=>{if(y.id==='pos'||y.id==='settings'){pull.push(Object.assign({},y,{tampil:true}));return false}if(y.anak)y.anak=ext(y.anak);return true});
   top.forEach(x=>{if(x.tampil===false&&x.anak)x.anak=ext(x.anak)});

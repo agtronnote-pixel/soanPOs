@@ -46,6 +46,12 @@
       "kasir": true
     },
     {
+      "id": "finance",
+      "label": "Keuangan",
+      "tampil": true,
+      "kasir": false
+    },
+    {
       "id": "settings",
       "label": "Pengaturan",
       "tampil": true,
