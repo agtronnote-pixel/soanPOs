@@ -74,6 +74,11 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .chk input{width:18px;height:18px;accent-color:var(--amber)}
 .st-pick{display:grid;grid-template-columns:repeat(auto-fill,minmax(140px,1fr));gap:8px}.st-opt{display:flex;flex-direction:column;align-items:flex-start;gap:2px;text-align:left;border:1.5px solid var(--line);background:var(--surface);color:var(--ink);border-radius:12px;padding:9px 11px;cursor:pointer;font:inherit}.st-opt b{font-size:14px}.st-opt span{font-size:11.5px;color:var(--muted)}.st-opt.on{border-color:var(--amber);background:var(--amber-soft,var(--surface-2));box-shadow:inset 0 0 0 1px var(--amber)}
 .inv-foot{position:sticky;bottom:0;z-index:5;display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:10px 12px;margin-top:12px;box-shadow:0 -6px 18px rgba(0,0,0,.06)}.inv-foot .in{flex:1;min-width:160px}.inv-cnt{width:96px;text-align:right}@media (max-width:640px){.inv-tbl{min-width:0!important}.inv-tbl thead{display:none}.inv-tbl tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:6px 10px;padding:12px 16px;border-bottom:1px solid var(--line);align-items:center}.inv-tbl td{border:0!important;padding:0!important;text-align:left!important}.inv-tbl td:nth-child(1){grid-column:1/-1}.inv-tbl td:nth-child(2)::before{content:"Tercatat ";color:var(--muted);font-size:12px}.inv-tbl td:nth-child(3){display:none}.inv-tbl td:nth-child(4){justify-self:end}.inv-tbl td:nth-child(5){display:flex;align-items:center;gap:8px}.inv-tbl td:nth-child(5)::before{content:"Hitung fisik";color:var(--muted);font-size:12px;white-space:nowrap}.inv-tbl td:nth-child(6){justify-self:end}.inv-tbl td:nth-child(7){grid-column:1/-1}.inv-foot{position:static;box-shadow:none}.inv-foot #inv-note{order:5;flex-basis:100%}}.inv-d{font-weight:700;white-space:nowrap}.inv-d.up{color:var(--ok)}.inv-d.dn{color:var(--bad)}
+.wa-prev{display:flex;justify-content:center;background:var(--surface-2);border-radius:14px;padding:12px}.wa-prev img{max-width:100%;width:340px;height:auto;box-shadow:0 6px 22px rgba(0,0,0,.18)}
+.wa-txt{background:#e7ffdb;color:#111b21;border-radius:10px;padding:10px 12px;font-size:13.5px;line-height:1.45;white-space:normal;margin-top:6px;max-height:320px;overflow:auto}
+.wa-opt{width:100%;background:none;border:0;border-top:1px solid var(--line);text-align:left;cursor:pointer;color:inherit;font:inherit;padding:12px 2px}.wa-opt:disabled{opacity:.45;cursor:default}
+#wa-ask{position:fixed;right:max(16px,env(safe-area-inset-right,0px));top:calc(76px + env(safe-area-inset-top,0px));z-index:150;width:min(340px,calc(100vw - 32px));background:var(--surface);color:var(--ink);border:1px solid var(--line);border-left:4px solid #25D366;border-radius:14px;padding:12px 14px;box-shadow:0 12px 34px rgba(0,0,0,.22)}#wa-ask p{margin:4px 0 10px;font-size:13px;color:var(--muted)}#wa-ask .row{display:flex;gap:8px}
+@media (max-width:760px){#wa-ask{top:calc(64px + env(safe-area-inset-top,0px));left:max(16px,env(safe-area-inset-left,0px));right:max(16px,env(safe-area-inset-right,0px));width:auto}}
 .ak-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}.ak-grid .chk{font-weight:500}@media (max-width:420px){.ak-grid{grid-template-columns:1fr}}
 
 .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font:600 11px/1.4 var(--font-body);background:var(--surface-2);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
@@ -441,6 +446,7 @@ function demoIngredients(list,log,products,now){
   SEED_ING.forEach(a=>{list.push({id:a[0],name:a[1],unit:a[2],stock:a[3],min:a[4],cost:a[5],supplier:a[6],active:true});log.push({id:uid(),ts:addDays(now,-14),iid:a[0],type:'restock',qty:a[3],note:'Stok awal',unitCost:a[5],userId:'u-owner'})});
   products.forEach(p=>{const r=DEMO_RECIPES[p.sku];if(!r)return;p.recipe=r.map(x=>({iid:x[0],qty:x[1]}));p.mode='recipe';p.track=false;p.cost=recipeCost(p.recipe,list)});
 }
+const WA_DEF={on:true,grup:'Soan Kofe · Operasional',buka:true,tutup:true,stok:true,jam:'12:00, 17:00'};
 function migrate(d){
   let ch=false;
   if(!Array.isArray(d.ingredients)){d.ingredients=[];ch=true}
@@ -449,6 +455,7 @@ function migrate(d){
   if(!Array.isArray(d.cashLog)){d.cashLog=[];ch=true}
   if(!Array.isArray(d.invoices)){d.invoices=[];ch=true}
   if(d.settings.drawerLimit===undefined){d.settings.drawerLimit=200000;ch=true}
+  if(!d.settings.wa||typeof d.settings.wa!=='object'){d.settings.wa=Object.assign({},WA_DEF);ch=true}
   if((d.v||1)<2){
     if(d.demo&&!d.ingredients.length)demoIngredients(d.ingredients,d.ingLog,d.products,Date.now());
     d.products.forEach(p=>{if(!p.mode)p.mode=hasRecipe(p)?'recipe':p.track?'stock':'none'});
@@ -906,6 +913,7 @@ function completeSale(){
   save();
   S.pos=Object.assign(freshPos(),{cat:S.pos.cat,q:S.pos.q});S.pay=null;
   render();showReceipt(sale,true);autoPrint(sale);
+  setTimeout(waTick,1500);
 }
 
 /* struk */
@@ -1207,13 +1215,138 @@ function recapModal(sh){
   const r=shiftRecap(sh);S.recapId=sh.id;
   const view=recapLines(r).map(l=>l.t?'<div'+(l.b?' class="rk-b"':'')+'>'+esc(l.t)+'</div>':'<div class="rk-e"></div>').join('');
   modal({title:'Rekap shift',wide:true,body:'<div class="rk">'+view+'</div>'+(r.closed?'':'<p class="muted" style="margin-top:10px">Shift belum ditutup. Uang tunai aktual terisi setelah tutup shift.</p>'),
-    foot:'<button class="btn ghost" data-act="recap-copy">'+ico('copy')+'Salin teks</button>'+(navigator.share?'<button class="btn ghost" data-act="recap-share">Bagikan</button>':'')+'<button class="btn primary" data-act="recap-print">'+ico('receipt')+'Cetak</button>'});
+    foot:'<button class="btn ghost" data-act="recap-copy">'+ico('copy')+'Salin teks</button><button class="btn ghost" data-act="recap-print">'+ico('receipt')+'Cetak</button><button class="btn primary" data-act="wa-send" data-ev="tutup" data-id="'+sh.id+'">Kirim ke grup</button>'});
 }
 const recapShift=()=>db.shifts.find(x=>x.id===S.recapId);
 ACT['shift-recap']=el=>{const sh=db.shifts.find(x=>x.id===el.dataset.id)||curShift();if(sh)recapModal(sh)};
 ACT['recap-copy']=()=>{const sh=recapShift();if(sh)copyText(recapText(shiftRecap(sh)))};
 ACT['recap-share']=()=>{const sh=recapShift();if(!sh)return;navigator.share({title:'Rekap shift',text:recapText(shiftRecap(sh))}).catch(()=>{})};
 ACT['recap-print']=()=>{const sh=recapShift();if(sh)printRecap(shiftRecap(sh))};
+/* ========== laporan ke grup WhatsApp: kirim sekali ketuk, pengingat, kartu gambar ==========
+   Tanpa server luar: pesan disiapkan di aplikasi, lalu dibagikan lewat WhatsApp (pilih grup, tekan kirim). */
+const WA_KEY='soankofe.pos.wa';
+const waCfg=()=>Object.assign({},WA_DEF,db.settings.wa||{});
+const waJam=()=>String(waCfg().jam||'').split(/[,\s]+/).map(t=>t.trim()).filter(t=>/^([01]?\d|2[0-3])[:.][0-5]\d$/.test(t)).map(t=>{const [h,m]=t.split(/[:.]/);return p2(+h)+':'+m}).sort();
+function waState(){try{return JSON.parse(lsGet(WA_KEY))||{}}catch(e){return {}}}
+function waStateSet(o){try{lsSet(WA_KEY,JSON.stringify(o))}catch(e){}}
+const DAY_ID=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
+const waTgl=ts=>{const d=new Date(ts);return DAY_ID[d.getDay()]+', '+d.getDate()+' '+MON_EN[d.getMonth()]+' '+d.getFullYear()};
+function waStockGroups(){
+  const g={Habis:[],Menipis:[],Aman:[]};
+  db.ingredients.filter(x=>x.active!==false).forEach(x=>{const st=ingState(x);g[st==='bad'?'Habis':st==='warn'?'Menipis':'Aman'].push({name:x.name,qty:Math.max(0,x.stock),unit:x.unit})});
+  db.products.filter(p=>p.active&&modeOf(p)==='stock').forEach(p=>{const mn=p.min||0;g[p.stock<=0?'Habis':p.stock<=mn?'Menipis':'Aman'].push({name:p.name,qty:Math.max(0,p.stock),unit:'pcs'})});
+  Object.values(g).forEach(a=>a.sort((x,y)=>x.name.localeCompare(y.name)));return g;
+}
+function waPayLines(sh){const x=shiftStats(sh),by={};x.ss.forEach(s=>{by[s.method]=(by[s.method]||0)+s.total});const ms=UI.methods.concat(Object.keys(METHODS).filter(k=>!UI.methods.includes(k))).filter(k=>k==='cash'||by[k]);return {x,by,ms}}
+function waText(ev,sh){
+  const st=db.settings,nm=(st.storeName||'Soan Kofe').toUpperCase(),now=Date.now(),b=cashBal();
+  if(ev==='buka'){sh=sh||curShift();const u=sh&&userById(sh.userId);return '🟢 *'+nm+' BUKA*\n'+waTgl(sh?sh.openTs:now)+' · '+fmtTime(sh?sh.openTs:now)+'\n\nShift : '+(u?u.name:'-')+'\nKas awal Drawer : '+rpRekap(sh?sh.openCash:0)}
+  if(ev==='stok'){const g=waStockGroups(),list=(a,sisa)=>a.length?a.map((s,i)=>(i+1)+'. '+s.name+' ('+(sisa?'sisa ':'')+fq(s.qty)+' '+s.unit+')').join('\n'):'-';
+    return '📦 *STATUS STOK / INVENTORY*\n'+waTgl(now)+' · '+fmtTime(now)+'\n\n*Habis :*\n'+list(g.Habis)+'\n\n*Menipis :*\n'+list(g.Menipis,true)+'\n\n*Aman :*\n'+list(g.Aman)}
+  if(ev==='jalan'){sh=sh||curShift();if(!sh)return '';const u=userById(sh.userId),P=waPayLines(sh);
+    return '📊 *TRANSAKSI BERJALAN*\n'+waTgl(now)+' · '+fmtTime(now)+'\nShift : '+(u?u.name:'-')+' (sejak '+fmtTime(sh.openTs)+')\n\nTransaksi : '+P.x.ss.length+'\n'+P.ms.map(k=>METHODS[k]+' : '+rpRekap(P.by[k])).join('\n')+'\n*Total : '+rpRekap(P.x.total)+'*'+(cashOn()?'\n\nUang di Drawer : '+rpRekap(b.drawer)+'\nUang di Dompet : '+rpRekap(b.dompet):'')}
+  if(ev==='tutup'){if(!sh)return '';const r=shiftRecap(sh);return '🔴 *'+nm+' TUTUP*\n\n'+recapText(r)+(cashOn()?'\n\n*KONDISI KAS :*\nUang di Drawer : '+rpRekap(cashBal(r.closed?r.end:null).drawer)+'\nUang di Dompet : '+rpRekap(cashBal(r.closed?r.end:null).dompet):'')}
+  return '';
+}
+/* kartu gambar bergaya struk cetak 58 mm (32 karakter) */
+function waCardLines(ev,sh){
+  const W=32,SEP='-'.repeat(W),L=[],C=t=>L.push({t:asc(t),a:'c'}),T=(t,b)=>wrapTxt(asc(t),W).forEach(x=>L.push({t:x,b:b?1:0}));
+  const LR=(a,v,b)=>{a=asc(a);v=asc(v);const g=W-a.length-v.length;L.push({t:g>=1?a+' '.repeat(g)+v:a+' '+v,b:b?1:0})};
+  const nm=asc(db.settings.storeName||'Soan Kofe'),rpk=v=>'Rp '+Math.round(v||0).toLocaleString('id-ID');
+  if(ev==='jalan'){const u=userById(sh.userId),P=waPayLines(sh),b=cashBal(),now=Date.now();
+    L.push({t:nm,a:'c',big:1});C('TRANSAKSI BERJALAN');C(fmtDT(now));C('Shift: '+(u?u.name:'-')+' (sejak '+fmtTime(sh.openTs)+')');L.push({t:SEP});
+    LR('Transaksi',String(P.x.ss.length));P.ms.forEach(k=>LR(METHODS[k],rpk(P.by[k])));L.push({t:SEP});LR('TOTAL',rpk(P.x.total),1);
+    if(cashOn()){L.push({t:SEP});LR('Uang di Drawer',rpk(b.drawer));LR('Uang di Dompet',rpk(b.dompet))}
+  }else{const r=shiftRecap(sh);recapPrintLines(r,W).forEach((l,i)=>{if(i===0)L.push({t:nm,a:'c',big:1});else if(/^Dicetak /.test(l.t))return;else L.push(l)});
+    if(L[L.length-1].t===SEP)L.pop();
+    if(cashOn()){const b=cashBal(r.closed?r.end:null);L.push({t:''});T('KONDISI KAS :',1);T('Uang di Drawer : '+rpRekap(b.drawer));T('Uang di Dompet : '+rpRekap(b.dompet))}
+  }
+  L.push({t:SEP});C('Dikirim dari '+nm+' POS');return L;
+}
+function waCard(lines){
+  const sc=2,cw=10.2,lh=19,padX=16,padY=20,w=Math.round(32*cw+padX*2),h=padY*2+lines.reduce((a,l)=>a+(l.big?32:lh),0)+14;
+  const cv=document.createElement('canvas');cv.width=w*sc;cv.height=h*sc;const g=cv.getContext('2d');g.scale(sc,sc);
+  g.fillStyle='#FFFDF8';g.fillRect(0,0,w,h);g.fillStyle='#151412';
+  for(let x=0;x<w;x+=10){g.beginPath();g.moveTo(x,h);g.lineTo(x+5,h-6);g.lineTo(x+10,h);g.fill()}
+  let y=padY;const mono='ui-monospace, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace';
+  lines.forEach(l=>{
+    if(l.big){g.font='800 24px system-ui, -apple-system, "Segoe UI", sans-serif';g.textAlign='center';g.fillText(l.t,w/2,y+23);g.textAlign='left';y+=32;return}
+    g.font=(l.b?'700 ':'400 ')+'16px '+mono;
+    if(l.a==='c'){g.textAlign='center';g.fillText(l.t,w/2,y+15);g.textAlign='left'}else g.fillText(l.t,padX,y+15);y+=lh});
+  return cv.toDataURL('image/png');
+}
+function dataBlob(u){const [h,b]=u.split(','),bin=atob(b),a=new Uint8Array(bin.length);for(let i=0;i<bin.length;i++)a[i]=bin.charCodeAt(i);return new Blob([a],{type:h.slice(5).split(';')[0]})}
+const waHTML=t=>esc(t).replace(/\*([^*\n]+)\*/g,'<b>$1</b>').replace(/\n/g,'<br>');
+function waSend(ev,id){
+  const sh=id?db.shifts.find(x=>x.id===id):ev==='tutup'?db.shifts.filter(x=>x.closeTs).sort((a,b)=>b.closeTs-a.closeTs)[0]:curShift();
+  if((ev==='jalan'||ev==='buka')&&!sh){toast('Belum ada shift yang dibuka');return}
+  if(ev==='tutup'&&!sh){toast('Belum ada shift yang ditutup');return}
+  const txt=waText(ev,sh),img=(ev==='jalan'||ev==='tutup')?waCard(waCardLines(ev,sh)):null,c=waCfg();
+  S.wa={ev,txt,img};waAskHide();
+  const name={buka:'Status buka',jalan:'Transaksi berjalan',tutup:'Rekap tutup shift',stok:'Status stok'}[ev];
+  modal({title:'Kirim ke grup',wide:!!img,body:'<p class="muted" style="margin:0 0 10px">'+esc(name)+' → <b>'+esc(c.grup)+'</b></p>'
+    +(img?'<div class="wa-prev"><img src="'+img+'" alt="Kartu '+esc(name)+'"></div><details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Teks yang ikut dikirim</summary><div class="wa-txt">'+waHTML(txt)+'</div></details>':'<div class="wa-txt">'+waHTML(txt)+'</div>')
+    +'<p class="muted" style="font-size:12px;margin:10px 0 0">Tekan <b>Kirim ke WhatsApp</b>, pilih grup <b>'+esc(c.grup)+'</b>, lalu kirim.'+(img?' Untuk menyematkan di atas grup: tekan lama pesannya di WhatsApp → Sematkan.':'')+'</p>',
+    foot:'<button class="btn ghost" data-act="wa-copy">'+ico('copy')+'Salin teks</button>'+(img?'<a class="btn ghost" href="'+img+'" download="soankofe-'+ev+'-'+isoDate(new Date())+'.png">Simpan gambar</a>':'')+'<button class="btn primary" data-act="wa-go">Kirim ke WhatsApp</button>'});
+}
+ACT['wa-send']=el=>waSend(el.dataset.ev,el.dataset.id||null);
+ACT['wa-copy']=()=>{if(S.wa)copyText(S.wa.txt)};
+ACT['wa-go']=async()=>{
+  const w=S.wa;if(!w)return;const url='https://wa.me/?text='+encodeURIComponent(w.txt);
+  try{
+    if(w.img&&navigator.canShare){const f=new File([dataBlob(w.img)],'soankofe-'+w.ev+'.png',{type:'image/png'});if(navigator.canShare({files:[f]})){await navigator.share({files:[f],text:w.txt});closeModal();toast('Dibagikan');return}}
+    if(!w.img&&navigator.share){await navigator.share({text:w.txt});closeModal();toast('Dibagikan');return}
+  }catch(e){if(e&&e.name==='AbortError')return}
+  if(w.img){copyText(w.txt);toast('Teks disalin. Simpan gambar lalu lampirkan di WhatsApp')}
+  window.open(url,'_blank','noopener');
+};
+ACT['wa-menu']=()=>{
+  const sh=curShift(),last=db.shifts.filter(x=>x.closeTs).sort((a,b)=>b.closeTs-a.closeTs)[0],c=waCfg();
+  const it=(ev,t,d,dis)=>'<button class="list-row wa-opt" data-act="wa-send" data-ev="'+ev+'"'+(dis?' disabled':'')+'><div class="l"><b>'+t+'</b><span class="muted">'+d+'</span></div><span class="muted">›</span></button>';
+  modal({title:'Lapor ke grup',body:'<p class="muted" style="margin:0 0 6px">Grup: <b>'+esc(c.grup)+'</b></p>'
+    +it('buka','Status buka','Shift, staf, dan kas awal',!sh)+it('jalan','Transaksi berjalan','Kartu gambar: jumlah transaksi, Tunai/QRIS/Transfer, Drawer & Dompet',!sh)
+    +it('tutup','Rekap tutup shift','Kartu gambar: rekap penjualan & kondisi kas'+(last?' ('+fmtDT(last.closeTs)+')':''),!last)+it('stok','Status stok / inventory','Habis, Menipis, Aman beserta jumlahnya')});
+};
+/* pengingat di aplikasi (melayang, tidak menutup layar kasir) */
+function waAsk(title,body,ev,id){
+  if(PREVIEW||!S.user)return;let el=$('#wa-ask');if(!el){el=document.createElement('div');el.id='wa-ask';el.setAttribute('role','alertdialog');document.body.appendChild(el)}
+  el.innerHTML='<b>'+esc(title)+'</b><p>'+esc(body)+'</p><div class="row"><button class="btn sm primary" data-act="wa-send" data-ev="'+ev+'"'+(id?' data-id="'+id+'"':'')+'>Kirim ke grup</button><button class="btn sm ghost" data-act="wa-later">Nanti</button></div>';
+  el.hidden=false;clearTimeout(S.waT);S.waT=setTimeout(waAskHide,180000);
+}
+function waAskHide(){const el=$('#wa-ask');if(el)el.hidden=true}
+ACT['wa-later']=()=>waAskHide();
+function waTick(){
+  if(PREVIEW||!S.user)return;const c=waCfg();if(!c.on)return;const ask=$('#wa-ask');if(ask&&!ask.hidden)return;
+  const sh=curShift(),st=waState(),now=new Date(),hm=p2(now.getHours())+':'+p2(now.getMinutes()),day=isoDate(now);
+  if(sh&&canView('shift')){
+    if(st.shift!==sh.id){st.shift=sh.id;st.done=waJam().filter(t=>t<=fmtTime(sh.openTs));waStateSet(st)}
+    const due=waJam().filter(t=>t<=hm&&!(st.done||[]).includes(t)).pop();
+    if(due){st.done=(st.done||[]).concat(waJam().filter(t=>t<=hm));waStateSet(st);waAsk('Pukul '+due+' · waktunya lapor','Kirim kartu transaksi berjalan ('+shiftStats(sh).ss.length+' transaksi) ke grup '+c.grup+'?','jalan');return}
+  }
+  if(c.stok&&(canView('shift')||canView('inventory'))){
+    const g=waStockGroups(),cur={};g.Habis.forEach(x=>cur[x.name]='Habis');g.Menipis.forEach(x=>cur[x.name]='Menipis');
+    if(st.stokDay!==day){st.stokDay=day;st.stok={}}
+    const baru=Object.keys(cur).filter(k=>st.stok[k]!==cur[k]&&!(cur[k]==='Menipis'&&st.stok[k]==='Habis'));
+    if(baru.length){baru.forEach(k=>st.stok[k]=cur[k]);waStateSet(st);waAsk('Stok perlu perhatian',baru.slice(0,4).map(k=>k+' ('+cur[k].toLowerCase()+')').join(', ')+(baru.length>4?' dan '+(baru.length-4)+' lainnya':'')+'. Kirim status stok ke grup?','stok')}
+  }
+}
+if(!PREVIEW)setInterval(waTick,30000);
+/* pengaturan laporan grup */
+function waCardHTML(){
+  const c=waCfg(),ck=(id,v,l)=>'<label class="chk"><input type="checkbox" id="'+id+'"'+(v?' checked':'')+'>'+l+'</label>';
+  return '<div class="card"><div class="card-h"><h3>Laporan grup WhatsApp</h3><button class="btn sm ghost" data-act="wa-menu">Kirim sekarang</button></div><div class="form">'
+   +ck('wa-on',c.on,'Aktifkan pengingat lapor ke grup')
+   +'<div class="fld"><label class="lbl" for="wa-grup">Nama grup tujuan</label><input class="in" id="wa-grup" value="'+esc(c.grup)+'" placeholder="Soan Kofe · Operasional"></div>'
+   +ck('wa-buka',c.buka,'Ingatkan saat shift dibuka (status BUKA)')+ck('wa-tutup',c.tutup,'Ingatkan saat shift ditutup (kartu rekap & kondisi kas)')+ck('wa-stok',c.stok,'Ingatkan saat bahan baku menipis / habis')
+   +'<div class="fld"><label class="lbl" for="wa-jam">Jam lapor transaksi berjalan</label><input class="in" id="wa-jam" value="'+esc(c.jam)+'" placeholder="12:00, 17:00"><span class="muted" style="font-size:12px">Pisahkan dengan koma. Kosongkan bila tidak perlu.</span></div>'
+   +'<p class="muted" style="font-size:12px;margin:0">Pesan dikirim lewat WhatsApp di perangkat ini: aplikasi menyiapkan teks & kartu gambar, kasir memilih grup lalu menekan kirim. Tidak memakai server luar.</p>'
+   +'<button class="btn primary" data-act="wa-save">Simpan</button></div></div>';
+}
+ACT['wa-save']=()=>{
+  const jam=$('#wa-jam').value.trim();db.settings.wa={on:$('#wa-on').checked,grup:$('#wa-grup').value.trim()||WA_DEF.grup,buka:$('#wa-buka').checked,tutup:$('#wa-tutup').checked,stok:$('#wa-stok').checked,jam};
+  const bad=jam.split(/[,\s]+/).filter(t=>t&&!/^([01]?\d|2[0-3])[:.][0-5]\d$/.test(t));
+  save();render();toast(bad.length?'Tersimpan. Jam tidak dikenali: '+bad.join(', '):'Pengaturan laporan grup tersimpan');
+};
 /* ========== pengeluaran tunai: beli bahan baku (masuk stok) atau keterangan manual ========== */
 const EXP_QUICK=['Bayar parkir','Ongkir','Bensin','Galon air','Kebersihan','Gas LPG'];
 function expRecent(){const seen=new Set(),out=[];(db.cashLog||[]).slice().reverse().forEach(e=>{const l=(e.label||e.ket||'').trim();if(e.jenis!=='kredit'||e.kat!=='lain'||!l||seen.has(l.toLowerCase()))return;seen.add(l.toLowerCase());out.push(l)});return out.slice(0,12)}
@@ -1544,7 +1677,7 @@ VIEWS.shift=function(){
   else{
     const x=shiftStats(sh),u=userById(sh.userId);
     const moves=sh.moves.length?sh.moves.slice().reverse().map(m=>'<div class="list-row"><div class="l"><b>'+(m.type==='in'?'Kas masuk':'Kas keluar')+'</b><span class="muted">'+fmtTime(m.ts)+' · '+esc(m.note||'-')+'</span></div><b class="num" style="color:var(--'+(m.type==='in'?'ok':'bad')+')">'+(m.type==='in'?'+':'−')+rp(m.amount)+'</b></div>').join(''):'<p class="muted">Belum ada kas masuk atau keluar.</p>';
-    cur='<div class="card"><div class="card-h"><div><div class="lbl"><span class="dot"></span>Shift terbuka</div><h3 style="margin-top:6px">Sejak '+fmtTime(sh.openTs)+' · '+esc(u?u.name:'-')+'</h3></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" data-act="shift-recap" data-id="'+sh.id+'">Rekap</button><button class="btn ghost sm" data-act="cash-in">Kas masuk</button><button class="btn ghost sm" data-act="cash-out">Kas keluar</button><button class="btn dark sm" data-act="shift-close">Tutup shift</button></div></div><div class="kpis"><div class="kpi"><span class="lbl">Kas awal</span><span class="v">'+rp(sh.openCash)+'</span></div><div class="kpi"><span class="lbl">Penjualan tunai</span><span class="v">'+rp(x.cash)+'</span></div><div class="kpi"><span class="lbl">Total penjualan</span><span class="v">'+rp(x.total)+'</span><span class="muted">'+x.ss.length+' transaksi</span></div><div class="kpi hero"><span class="lbl">Kas seharusnya di laci</span><span class="v">'+rp(x.expected)+'</span></div></div><div style="margin-top:16px"><div class="lbl" style="margin-bottom:4px">Kas masuk / keluar</div>'+moves+'</div></div>';
+    cur='<div class="card"><div class="card-h"><div><div class="lbl"><span class="dot"></span>Shift terbuka</div><h3 style="margin-top:6px">Sejak '+fmtTime(sh.openTs)+' · '+esc(u?u.name:'-')+'</h3></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost sm" data-act="shift-recap" data-id="'+sh.id+'">Rekap</button><button class="btn ghost sm" data-act="wa-menu">Lapor grup</button><button class="btn ghost sm" data-act="cash-in">Kas masuk</button><button class="btn ghost sm" data-act="cash-out">Kas keluar</button><button class="btn dark sm" data-act="shift-close">Tutup shift</button></div></div><div class="kpis"><div class="kpi"><span class="lbl">Kas awal</span><span class="v">'+rp(sh.openCash)+'</span></div><div class="kpi"><span class="lbl">Penjualan tunai</span><span class="v">'+rp(x.cash)+'</span></div><div class="kpi"><span class="lbl">Total penjualan</span><span class="v">'+rp(x.total)+'</span><span class="muted">'+x.ss.length+' transaksi</span></div><div class="kpi hero"><span class="lbl">Kas seharusnya di laci</span><span class="v">'+rp(x.expected)+'</span></div></div><div style="margin-top:16px"><div class="lbl" style="margin-bottom:4px">Kas masuk / keluar</div>'+moves+'</div></div>';
   }
   const hist=db.shifts.filter(s=>s.closeTs).sort((a,b)=>b.closeTs-a.closeTs).slice(0,14).map(s=>{
     const x=shiftStats(s),u=userById(s.userId),d=s.diff||0;
@@ -1568,7 +1701,7 @@ VIEWS.settings=function(){
   return '<div class="set-grid"><div class="card"><div class="card-h"><h3>Profil toko</h3></div><div class="form">'+fld('st-name','Nama toko',s.storeName)+fld('st-tag','Tagline',s.tagline)+fld('st-addr','Alamat',s.address)+fld('st-phone','Telepon',s.phone)+fld('st-foot','Pesan di bawah struk',s.footer)+fld('st-prefix','Awalan nomor struk',s.prefix,'maxlength="4"')+'<button class="btn primary" data-act="save-settings">Simpan profil</button></div></div>'
    +'<div class="card"><div class="card-h"><h3>Pajak, layanan, poin, dan stok</h3></div><div class="form"><label class="chk"><input type="checkbox" id="st-tax-on"'+(s.taxEnabled?' checked':'')+'>Kenakan PPN</label>'+fld('st-tax','Tarif PPN (%)',s.taxRate,'inputmode="numeric"')+'<label class="chk"><input type="checkbox" id="st-svc-on"'+(s.serviceEnabled?' checked':'')+'>Kenakan biaya layanan</label>'+fld('st-svc','Biaya layanan (%)',s.serviceRate,'inputmode="numeric"')+fld('st-points','Belanja per 1 poin (Rp)',s.pointsPer,'inputmode="numeric"')+'<label class="chk"><input type="checkbox" id="st-block"'+(s.blockOut?' checked':'')+'>Blokir penjualan jika bahan atau stok tidak cukup</label>'+'<button class="btn primary" data-act="save-tax">Simpan pajak</button></div></div>'
    +'<div class="card"><div class="card-h"><h3>Pengguna</h3><button class="btn sm ghost" data-act="user-new">'+ico('plus')+'Tambah</button></div>'+users+'</div>'
-   +syncCardHTML()+printerCardHTML()+'<div class="card"><div class="card-h"><h3>Data</h3></div><div class="form">'+storageStatusHTML()+'<button class="btn ghost" data-act="backup">Cadangkan data</button>'+snapBtn()+'<button class="btn ghost" data-act="restore">Pulihkan dari cadangan</button><button class="btn danger" data-act="clear-demo">Hapus transaksi &amp; pelanggan contoh</button><button class="btn danger" data-act="reset-demo">Reset ke data contoh</button></div></div></div>';
+   +waCardHTML()+syncCardHTML()+printerCardHTML()+'<div class="card"><div class="card-h"><h3>Data</h3></div><div class="form">'+storageStatusHTML()+'<button class="btn ghost" data-act="backup">Cadangkan data</button>'+snapBtn()+'<button class="btn ghost" data-act="restore">Pulihkan dari cadangan</button><button class="btn danger" data-act="clear-demo">Hapus transaksi &amp; pelanggan contoh</button><button class="btn danger" data-act="reset-demo">Reset ke data contoh</button></div></div></div>';
 };
 function aksesHTML(st,u){
   if(st==='owner')return '<p class="muted" style="margin:0">Owner punya akses penuh, termasuk Pengaturan dan pengguna.</p>';
@@ -1859,7 +1992,7 @@ VIEWS.inventory=function(){
   const I=S.inv||(S.inv={tab:'cek',f:'all',q:'',cnt:{}}),it=invItems(),all=it.ings.concat(it.prods),t0=sod(Date.now());
   const n=st=>all.filter(x=>x.st===st).length,todo=all.filter(x=>!(x.checkTs>=t0)).length,last=Math.max(0,...all.map(x=>x.checkTs||0));
   const kp='<div class="kpis"><div class="kpi"><span class="lbl">Item dipantau</span><span class="v">'+all.length+'</span><span class="muted" style="font-size:12px">'+it.ings.length+' bahan · '+it.prods.length+' produk</span></div><div class="kpi"><span class="lbl">Habis</span><span class="v" style="color:var(--bad)">'+n('bad')+'</span></div><div class="kpi"><span class="lbl">Menipis</span><span class="v" style="color:var(--warn,#b7791f)">'+n('warn')+'</span></div><div class="kpi'+(todo?' hero':'')+'"><span class="lbl">Belum dicek hari ini</span><span class="v">'+todo+'</span><span class="muted" style="font-size:12px">'+(last?'Terakhir '+fmtDT(last):'Belum ada pengecekan')+'</span></div></div>';
-  const tabs='<div class="chips" style="margin:4px 0 2px">'+chip('inv-tab','cek','Cek & sesuaikan stok',I.tab)+chip('inv-tab','log','Riwayat mutasi',I.tab)+'</div>';
+  const tabs='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin:4px 0 2px"><div class="chips">'+chip('inv-tab','cek','Cek & sesuaikan stok',I.tab)+chip('inv-tab','log','Riwayat mutasi',I.tab)+'</div><button class="btn sm ghost" data-act="wa-send" data-ev="stok">Kirim status stok ke grup</button></div>';
   if(I.tab==='log')return kp+tabs+logTabHTML();
   const fl=[['all','Semua'],['bad','Habis'],['warn','Menipis'],['todo','Belum dicek hari ini']];
   const head='<thead><tr><th>Item</th><th class="r">Tercatat</th><th class="r">Min</th><th>Status</th><th class="r">Hitung fisik</th><th class="r">Selisih</th><th></th></tr></thead>';
@@ -1883,7 +2016,7 @@ ACT['inv-save']=()=>{
     if(Math.abs(d)>1e-9){c++;if(x.k[0]==='i'){r.stock=Math.round((r.stock+d)*1000)/1000;logIng(r.id,'opname',d,'Cek stok'+(note.trim()?': '+note.trim():''))}else{r.stock+=d;logStock(r.id,'opname',d,'Cek stok'+(note.trim()?': '+note.trim():''))}}
     r.checkTs=now;r.checkBy=me});
   if(!n){toast('Belum ada hasil hitung yang diisi');return}
-  S.inv.cnt={};save();render();toast(n+' item dicek'+(c?', '+c+' disesuaikan':', semua cocok'));
+  S.inv.cnt={};save();render();setTimeout(waTick,1200);toast(n+' item dicek'+(c?', '+c+' disesuaikan':', semua cocok'));
 };
 VIEWS.menu=function(){
   const T0={sum:'Ringkasan',menu:'Menu ('+db.products.length+')',ing:'Bahan baku ('+db.ingredients.length+')',log:'Mutasi stok'};
@@ -2147,6 +2280,7 @@ ACT['open-shift']=()=>{
   if(cashOn()){const d=oc-cashBal().drawer,first=!db.cashLog.length;if(d)cashEntry('drawer',d>0?'debit':'kredit',Math.abs(d),first?'Saldo awal Drawer (buka shift)':'Penyesuaian kas awal shift',{ref:sh.id});sh.dompetOpen=cashBal().dompet}
   db.shifts.push(sh);
   save();render();toast('Shift dibuka');
+  if(waCfg().on&&waCfg().buka)setTimeout(()=>waAsk('Shift dibuka','Kirim status BUKA ke grup '+waCfg().grup+'?','buka'),600);
 };
 ACT['cash-in']=()=>cashMove('in');
 ACT['cash-out']=()=>expOpen();
@@ -2169,6 +2303,7 @@ ACT['shift-close-go']=()=>{
   Object.assign(sh,{closeTs:Date.now(),closeCash:c,expectedCash:exp,diff:c-exp,note:$('#sc-note').value.trim()});
   if(sh.dompetOpen!=null&&cashOn()){sh.dompetClose=cashBal().dompet;if(c!==exp)cashEntry('drawer',c>exp?'debit':'kredit',Math.abs(c-exp),'Selisih hitung tutup shift ('+(c>exp?'lebih':'kurang')+')',{ref:sh.id})}
   save();closeModal();render();toast('Shift ditutup');recapModal(sh);
+  if(waCfg().on&&waCfg().tutup)setTimeout(()=>waAsk('Shift ditutup','Kirim kartu rekap penjualan & kondisi kas (Drawer/Dompet) ke grup '+waCfg().grup+'?','tutup',sh.id),600);
 };
 /* kasir */
 ACT.pcat=el=>{S.pos.cat=el.dataset.v;$$('[data-act="pcat"]').forEach(b=>b.classList.toggle('on',b.dataset.v===S.pos.cat));updatePOS()};
