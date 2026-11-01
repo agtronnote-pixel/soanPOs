@@ -224,7 +224,11 @@ td b{font-weight:600}
 /* cetak */
 #print-area{display:none}
 .rk{font:13px/1.55 ui-monospace,Menlo,Consolas,monospace;background:var(--paper);color:var(--paper-ink);border:1px solid var(--line);border-radius:14px;padding:14px 16px;max-height:58vh;overflow:auto;white-space:pre-wrap;word-break:break-word}
-.rk-b{font-weight:700}.rk-e{height:10px}
+.rk-b{font-weight:700}
+.bf-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.3fr) 70px 110px auto;gap:6px;margin-top:6px;align-items:center}
+.bf-paste{border:1px dashed var(--line-2);border-radius:14px;padding:10px 12px;background:var(--surface-2)}
+.bf-paste summary{cursor:pointer}.bf-paste textarea{margin-top:8px;font-family:ui-monospace,Menlo,monospace;font-size:12px}
+@media (max-width:640px){.bf-row{grid-template-columns:1fr 70px auto}.bf-row select{grid-column:1/-1}.bf-row [data-bf=price]{grid-column:1/2}}.rk-e{height:10px}
 code{font:12px ui-monospace,Menlo,Consolas,monospace;background:var(--surface-2);padding:1px 6px;border-radius:6px}
 @media print{
   html,body{background:#fff!important;color:#000!important}
@@ -932,7 +936,7 @@ function salesListHTML(){
   const paid=list.filter(s=>s.status==='paid'),sum=paid.reduce((a,s)=>a+s.total,0),shown=list.slice(0,150);
   const rows=shown.map(s=>{
     const cu=s.customerId?custById(s.customerId):null;
-    return '<tr data-act="sale-open" data-id="'+s.id+'"><td><b>'+esc(s.no)+'</b><div class="sub">'+fmtDT(s.ts)+'</div></td><td>'+(cu?esc(cu.name):'<span class="muted">Umum</span>')+'<div class="sub">'+TYPES[s.type]+(s.table?' · Meja '+esc(s.table):'')+'</div></td><td><span class="pill">'+METHODS[s.method]+'</span></td><td class="r"><b>'+rp(s.total)+'</b></td><td>'+(s.status==='void'?'<span class="pill bad">Dibatalkan</span>':'<span class="pill ok">Lunas</span>')+'</td></tr>';
+    return '<tr data-act="sale-open" data-id="'+s.id+'"><td><b>'+esc(s.no)+'</b>'+(s.manual?' <span class="pill">rekap manual</span>':'')+'<div class="sub">'+fmtDT(s.ts)+'</div></td><td>'+(cu?esc(cu.name):'<span class="muted">Umum</span>')+'<div class="sub">'+TYPES[s.type]+(s.table?' · Meja '+esc(s.table):'')+'</div></td><td><span class="pill">'+METHODS[s.method]+'</span></td><td class="r"><b>'+rp(s.total)+'</b></td><td>'+(s.status==='void'?'<span class="pill bad">Dibatalkan</span>':'<span class="pill ok">Lunas</span>')+'</td></tr>';
   }).join('');
   return '<div class="sumbar"><span><b>'+list.length+'</b> transaksi</span><span>Penjualan <b>'+rp(sum)+'</b></span>'+(list.length>shown.length?'<span>Menampilkan 150 terbaru</span>':'')+'</div><div class="tablewrap"><table><thead><tr><th>Struk</th><th>Pelanggan</th><th>Metode</th><th class="r">Total</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
@@ -1278,6 +1282,122 @@ ACT['kas-printgo']=async()=>{
     if(!PR.ch)await bleConnect(false);await bleWrite(bytes);toast('Rekap kas dicetak');
   }catch(e){toast(printErr(e))}
 };
+/* ========== input rekap terlewat (shift lama yang belum tercatat di sistem) ==========
+   Bisa ditempel dari teks rekap (format WhatsApp) atau diisi manual. Disimpan sebagai shift tertutup
+   + transaksi bertanda manual:true. Stok dan jurnal kas Drawer/Dompet sengaja tidak diubah,
+   karena kejadiannya sudah lewat. */
+const MON_ALL={jan:0,feb:1,mar:2,apr:3,may:4,mei:4,jun:5,jul:6,aug:7,agu:7,agt:7,sep:8,oct:9,okt:9,nov:10,dec:11,des:11};
+const moneyNum=t=>{const m=String(t||'').replace(/,-\s*$/,'').replace(/\.-\s*$/,'').replace(/[^\d]/g,'');return m?+m:0};
+function parseRangeTxt(t){
+  t=String(t||'').trim();const yNow=new Date().getFullYear();let m;
+  const mon=x=>MON_ALL[String(x).slice(0,3).toLowerCase()];
+  if((m=t.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s*-\s*(\d{1,2})\/(\d{1,2})\/(\d{4}))?/)))return [new Date(+m[3],m[2]-1,+m[1]),m[4]?new Date(+m[6],m[5]-1,+m[4]):new Date(+m[3],m[2]-1,+m[1])];
+  if((m=t.match(/^(\d{1,2})\s*([a-z]{3,})\s*(\d{4})?\s*-\s*(\d{1,2})\s*([a-z]{3,})\s*(\d{4})/i))&&mon(m[2])!=null&&mon(m[5])!=null)return [new Date(+(m[3]||m[6]),mon(m[2]),+m[1]),new Date(+m[6],mon(m[5]),+m[4])];
+  if((m=t.match(/^(\d{1,2})\s*-\s*(\d{1,2})\s+([a-z]{3,})\s+(\d{4})/i))&&mon(m[3])!=null)return [new Date(+m[4],mon(m[3]),+m[1]),new Date(+m[4],mon(m[3]),+m[2])];
+  if((m=t.match(/^(\d{1,2})\s+([a-z]{3,})\s+(\d{4})/i))&&mon(m[2])!=null){const d=new Date(+m[3],mon(m[2]),+m[1]);return [d,d]}
+  return null;
+}
+const normName=t=>String(t||'').toLowerCase().replace(/[^a-z0-9]/g,'');
+function matchProduct(name){const n=normName(name);if(!n)return null;return db.products.find(p=>normName(p.name)===n)||db.products.find(p=>normName(p.name).startsWith(n)||n.startsWith(normName(p.name)))||null}
+function methodOf(label){const l=label.toLowerCase();if(/tunai|cash|kontan/.test(l))return 'cash';if(/qris|qr/.test(l))return 'qris';if(/debit|kartu|edc|kredit/.test(l))return 'debit';if(/transfer|tf|bank|non tunai|web|online|gofood|grab|shopee/.test(l))return 'transfer';return null}
+function parseRecapText(txt){
+  const r={range:null,items:[],pay:{},kasAwal:0,kasKeluar:0,kasMasuk:0,aktual:null,unknown:[]};let sec='';
+  String(txt||'').split(/\r?\n/).map(l=>l.replace(/\*/g,'').trim()).forEach(l=>{
+    if(!l)return;const low=l.toLowerCase();
+    if(/^tanggal/.test(low)){r.range=parseRangeTxt(l.split(':').slice(1).join(':'));return}
+    if(/^total produk/.test(low)){sec='';return}
+    if(/^produk/.test(low)){sec='produk';return}
+    if(/penerimaan sistem/.test(low)){sec='sistem';return}
+    if(/penerimaan aktual/.test(low)){sec='aktual';return}
+    if(/arus kas\s*:?\s*$/.test(low)&&/detail/.test(low)){sec='kas';return}
+    if(/^total\b/.test(low))return;
+    const kv=l.match(/^(.+?)\s*:\s*(.*)$/);
+    if(sec==='produk'){const m=l.match(/^(\d+)\s*(?:x\s*)?(.+)$/i);if(m){r.items.push({qty:+m[1],name:m[2].trim()});return}}
+    if(!kv)return;const key=kv[1].toLowerCase(),val=moneyNum(kv[2]);
+    if(sec==='sistem'){if(/arus kas/.test(key))return;const me=methodOf(key);if(me)r.pay[me]=(r.pay[me]||0)+val;else if(val)r.unknown.push(kv[1])}
+    else if(sec==='aktual'){if(methodOf(key)==='cash'&&!/non/.test(key))r.aktual=val}
+    else if(sec==='kas'){if(/awal/.test(key))r.kasAwal=val;else if(/keluar/.test(key))r.kasKeluar=val;else if(/masuk/.test(key))r.kasMasuk=val}
+  });
+  return r;
+}
+const p2=n=>String(n).padStart(2,'0'),isoDate=d=>d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate());
+function bfRowHTML(it,i){
+  const opts='<option value="">(nama lain, ketik di samping)</option>'+db.products.map(p=>'<option value="'+p.id+'"'+(it.pid===p.id?' selected':'')+'>'+esc(p.name)+'</option>').join('');
+  return '<div class="bf-row"><select class="sel" data-bf="pid" data-i="'+i+'" aria-label="Produk">'+opts+'</select><input class="in" data-bf="name" data-i="'+i+'" value="'+esc(it.name)+'" placeholder="Nama produk" aria-label="Nama produk"><input class="in" data-bf="qty" data-i="'+i+'" value="'+(it.qty||'')+'" inputmode="numeric" placeholder="Jml" aria-label="Jumlah"><input class="in" data-bf="price" data-i="'+i+'" value="'+(it.price||'')+'" inputmode="numeric" placeholder="Harga" aria-label="Harga satuan"><button class="icon-btn" data-act="bf-del" data-i="'+i+'" aria-label="Hapus baris">'+ico('trash')+'</button></div>';
+}
+function bfSummary(){
+  const B=S.bf,val=B.items.reduce((a,i)=>a+(+i.price||0)*(+i.qty||0),0),pay=Object.values(B.pay).reduce((a,v)=>a+(+v||0),0),qty=B.items.reduce((a,i)=>a+(+i.qty||0),0);
+  const warn=val&&pay&&val!==pay?'<div class="banner" style="margin-top:8px"><span>Nilai produk ('+rp(val)+') berbeda dengan total penerimaan ('+rp(pay)+'). Tidak apa-apa bila karena diskon atau harga berubah; laporan memakai total penerimaan.</span></div>':'';
+  return '<b>'+qty+' pcs</b> · nilai produk '+rp(val)+' · penerimaan '+rp(pay)+warn;
+}
+function bfHTML(){
+  const B=S.bf,ms=Object.keys(METHODS),users=db.users.map(u=>'<option value="'+u.id+'"'+(B.userId===u.id?' selected':'')+'>'+esc(u.name)+'</option>').join('');
+  return '<details class="bf-paste"'+(B.items.some(i=>String(i.name).trim())?'':' open')+'><summary><b>Tempel teks rekap</b> <span class="muted">(format WhatsApp seperti rekap shift)</span></summary><textarea class="in" id="bf-txt" rows="7" placeholder="*Tanggal Penjualan : 26-27 Oct 2026*&#10;&#10;*Total Produk Terjual : 24 Pcs*&#10;Produk Jumlah :&#10;15 Manual Brew&#10;…"></textarea><button class="btn sm dark" data-act="bf-parse" style="margin-top:6px">Baca teks</button></details>'
+   +'<div class="fld-row"><div class="fld"><label class="lbl" for="bf-d1">Tanggal mulai</label><input class="in" type="date" id="bf-d1" data-bf="d1" value="'+B.d1+'"></div><div class="fld"><label class="lbl" for="bf-t1">Jam buka</label><input class="in" type="time" id="bf-t1" data-bf="t1" value="'+B.t1+'"></div><div class="fld"><label class="lbl" for="bf-d2">Tanggal selesai</label><input class="in" type="date" id="bf-d2" data-bf="d2" value="'+B.d2+'"></div><div class="fld"><label class="lbl" for="bf-t2">Jam tutup</label><input class="in" type="time" id="bf-t2" data-bf="t2" value="'+B.t2+'"></div><div class="fld"><label class="lbl" for="bf-user">Kasir</label><select class="sel" id="bf-user" data-bf="userId">'+users+'</select></div></div>'
+   +'<div class="lbl" style="margin-top:6px">Produk terjual</div><div id="bf-rows">'+B.items.map(bfRowHTML).join('')+'</div><button class="btn sm ghost" data-act="bf-add" style="margin-top:6px">'+ico('plus')+'Tambah produk</button>'
+   +'<div class="lbl" style="margin-top:14px">Penerimaan sistem</div><div class="fld-row">'+ms.map(k=>'<div class="fld"><label class="lbl" for="bf-p-'+k+'">'+esc(METHODS[k])+'</label><input class="in" id="bf-p-'+k+'" data-bf="pay" data-k="'+k+'" inputmode="numeric" value="'+(B.pay[k]||'')+'" placeholder="0"></div>').join('')+'</div>'
+   +'<div class="lbl" style="margin-top:6px">Arus kas & hitung tunai</div><div class="fld-row"><div class="fld"><label class="lbl" for="bf-ka">Kas awal</label><input class="in" id="bf-ka" data-bf="kasAwal" inputmode="numeric" value="'+(B.kasAwal||'')+'" placeholder="0"></div><div class="fld"><label class="lbl" for="bf-km">Kas masuk</label><input class="in" id="bf-km" data-bf="kasMasuk" inputmode="numeric" value="'+(B.kasMasuk||'')+'" placeholder="0"></div><div class="fld"><label class="lbl" for="bf-kk">Kas keluar</label><input class="in" id="bf-kk" data-bf="kasKeluar" inputmode="numeric" value="'+(B.kasKeluar||'')+'" placeholder="0"></div><div class="fld"><label class="lbl" for="bf-akt">Tunai aktual (hasil hitung)</label><input class="in" id="bf-akt" data-bf="aktual" inputmode="numeric" value="'+(B.aktual!=null?B.aktual:'')+'" placeholder="kosong = sama dengan sistem"></div></div>'
+   +'<div class="fld"><label class="lbl" for="bf-kkn">Keterangan kas keluar</label><input class="in" id="bf-kkn" data-bf="kkNote" value="'+esc(B.kkNote||'')+'" placeholder="Contoh: Beli es batu"></div>'
+   +'<p class="muted" id="bf-sum" style="margin:6px 0 0">'+bfSummary()+'</p><p class="muted" style="font-size:12px;margin:6px 0 0">Stok dan saldo Drawer/Dompet tidak diubah, karena kejadiannya sudah lewat.</p>';
+}
+function bfOpen(){
+  const y=new Date(Date.now()-86400e3);
+  S.bf={d1:isoDate(y),t1:'07:00',d2:isoDate(y),t2:'22:00',userId:(db.users.find(u=>u.role==='cashier')||db.users[0]).id,items:[{pid:'',name:'',qty:'',price:''}],pay:{},kasAwal:'',kasMasuk:'',kasKeluar:'',kkNote:'',aktual:null};
+  modal({title:'Input rekap terlewat',wide:true,body:'<div class="form" id="bf-body">'+bfHTML()+'</div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="bf-save">Simpan rekap</button>'});
+}
+const bfRender=()=>{const b=$('#bf-body');if(b)b.innerHTML=bfHTML()};
+ACT['bf-open']=()=>bfOpen();
+ACT['bf-add']=()=>{S.bf.items.push({pid:'',name:'',qty:'',price:''});$('#bf-rows').insertAdjacentHTML('beforeend',bfRowHTML(S.bf.items[S.bf.items.length-1],S.bf.items.length-1))};
+ACT['bf-del']=el=>{S.bf.items.splice(+el.dataset.i,1);if(!S.bf.items.length)S.bf.items.push({pid:'',name:'',qty:'',price:''});bfRender()};
+ACT['bf-parse']=()=>{
+  const r=parseRecapText($('#bf-txt').value);
+  if(!r.range&&!r.items.length&&!Object.keys(r.pay).length){toast('Teks tidak dikenali. Pastikan memakai format rekap shift.');return}
+  const B=S.bf;if(r.range){B.d1=isoDate(r.range[0]);B.d2=isoDate(r.range[1]);if(B.d1!==B.d2){B.t1='16:00';B.t2='02:00'}}
+  if(r.items.length)B.items=r.items.map(it=>{const p=matchProduct(it.name);return{pid:p?p.id:'',name:p?p.name:it.name,qty:it.qty,price:p?p.price:''}});
+  B.pay=r.pay;B.kasAwal=r.kasAwal||'';B.kasKeluar=r.kasKeluar||'';B.kasMasuk=r.kasMasuk||'';B.aktual=r.aktual;
+  bfRender();
+  const miss=B.items.filter(i=>!i.pid).map(i=>i.name);
+  toast('Teks terbaca: '+B.items.length+' produk'+(miss.length?'. '+miss.length+' produk tidak ada di menu, isi harganya manual':'')+(r.unknown.length?'. Metode tidak dikenal: '+r.unknown.join(', '):''));
+};
+document.addEventListener('input',e=>{const el=e.target;if(!S.bf||!el.dataset||!el.dataset.bf||!el.closest('#bf-body'))return;
+  const k=el.dataset.bf,i=+el.dataset.i,B=S.bf;
+  if(k==='name'||k==='qty'||k==='price'){B.items[i][k]=k==='name'?el.value:num(el.value)||''}
+  else if(k==='pay')B.pay[el.dataset.k]=num(el.value)||0;
+  else if(k==='aktual')B.aktual=el.value.trim()===''?null:num(el.value);
+  else if(['kasAwal','kasMasuk','kasKeluar'].includes(k))B[k]=num(el.value)||'';
+  else B[k]=el.value;
+  const sm=$('#bf-sum');if(sm)sm.innerHTML=bfSummary();
+});
+document.addEventListener('change',e=>{const el=e.target;if(!S.bf||!el.dataset||el.dataset.bf!=='pid'||!el.closest('#bf-body'))return;
+  const it=S.bf.items[+el.dataset.i],p=prodById(el.value);it.pid=el.value;if(p){it.name=p.name;it.price=p.price}bfRender();
+});
+ACT['bf-save']=()=>{
+  const B=S.bf,items=B.items.filter(i=>(+i.qty>0)&&String(i.name).trim());
+  const pay=Object.keys(B.pay).filter(k=>+B.pay[k]>0);
+  if(!B.d1||!B.d2){toast('Isi tanggal');return}
+  if(!pay.length){toast('Isi minimal satu penerimaan (Tunai, QRIS, dll.)');return}
+  const [y1,m1,d1]=B.d1.split('-').map(Number),[y2,m2,d2]=B.d2.split('-').map(Number),[h1,n1]=(B.t1||'07:00').split(':').map(Number),[h2,n2]=(B.t2||'22:00').split(':').map(Number);
+  const openTs=new Date(y1,m1-1,d1,h1,n1).getTime();let closeTs=new Date(y2,m2-1,d2,h2,n2).getTime();
+  if(closeTs<=openTs){toast('Waktu tutup harus setelah waktu buka');return}
+  if(closeTs>Date.now()){toast('Rekap terlewat harus di waktu yang sudah lewat');return}
+  const clash=db.shifts.find(x=>x.openTs<closeTs&&(x.closeTs||Date.now())>openTs);
+  if(clash&&!S.bfForce){S.bfForce=true;toast('Waktu ini bertabrakan dengan shift lain ('+fmtDT(clash.openTs)+'). Tekan Simpan sekali lagi untuk tetap menyimpan.');return}
+  S.bfForce=false;
+  const sh={id:uid(),userId:B.userId,openTs,openCash:+B.kasAwal||0,closeTs,closeCash:0,expectedCash:0,diff:0,note:'Input rekap manual',moves:[],manual:true};
+  if(+B.kasMasuk>0)sh.moves.push({id:uid(),ts:openTs+60000,type:'in',amount:+B.kasMasuk,note:'Kas masuk (rekap manual)'});
+  if(+B.kasKeluar>0)sh.moves.push({id:uid(),ts:closeTs-60000,type:'out',amount:+B.kasKeluar,note:B.kkNote||'Kas keluar (rekap manual)'});
+  const its=items.map(i=>{const p=prodById(i.pid);return{pid:i.pid||'manual-'+normName(i.name),name:String(i.name).trim(),price:+i.price||0,cost:p?unitCost(p):0,qty:+i.qty,note:'',rec:[]}});
+  const ord=pay.slice().sort((a,b)=>B.pay[b]-B.pay[a]),mid=Math.round((openTs+closeTs)/2);
+  ord.forEach((k,j)=>{
+    const total=+B.pay[k],its2=j===0?its:[],sub=its2.reduce((a,i)=>a+i.price*i.qty,0),ts=mid+j*1000;
+    db.sales.push({id:uid(),no:nextNo(ts),ts,userId:B.userId,customerId:null,type:'take',table:'',items:its2,discType:'rp',discValue:0,taxRate:0,serviceRate:0,method:k,ref:'',paid:total,change:0,status:'paid',shiftId:sh.id,points:0,subtotal:j===0?sub:total,discount:j===0?Math.max(0,sub-total):0,service:0,tax:0,total,manual:true,note:'Input rekap manual'});
+  });
+  db.shifts.push(sh);
+  const x=shiftStats(sh);sh.expectedCash=x.expected;sh.closeCash=B.aktual!=null?B.aktual:x.expected;sh.diff=sh.closeCash-sh.expectedCash;
+  save();closeModal();render();toast('Rekap tersimpan');recapModal(sh);
+};
+ACT['bf-delshift']=el=>{const sh=db.shifts.find(x=>x.id===el.dataset.id);if(!sh||!sh.manual)return;
+  confirmBox('Hapus rekap manual','Rekap '+fmtDate(sh.openTs)+' beserta transaksinya ('+db.sales.filter(s=>s.shiftId===sh.id).length+') akan dihapus. Hanya rekap yang diinput manual yang bisa dihapus.','Hapus',()=>{db.sales=db.sales.filter(s=>s.shiftId!==sh.id);db.shifts=db.shifts.filter(x=>x.id!==sh.id);save();render();toast('Rekap manual dihapus')})};
 VIEWS.shift=function(){
   const sh=curShift();let cur;
   if(!sh)cur=openShiftCard();
@@ -1288,9 +1408,9 @@ VIEWS.shift=function(){
   }
   const hist=db.shifts.filter(s=>s.closeTs).sort((a,b)=>b.closeTs-a.closeTs).slice(0,14).map(s=>{
     const x=shiftStats(s),u=userById(s.userId),d=s.diff||0;
-    return '<tr><td><b>'+fmtDate(s.openTs)+'</b><div class="sub">'+fmtTime(s.openTs)+' – '+fmtTime(s.closeTs)+'</div></td><td>'+esc(u?u.name:'-')+'</td><td class="r">'+rp(s.openCash)+'</td><td class="r">'+rp(x.total)+'</td><td class="r">'+rp(s.expectedCash)+'</td><td class="r">'+rp(s.closeCash)+'</td><td><span class="pill '+(d===0?'ok':d<0?'bad':'warn')+'">'+(d===0?'Cocok':(d>0?'Lebih ':'Kurang ')+rp(Math.abs(d)))+'</span></td><td class="r"><button class="btn sm ghost" data-act="shift-recap" data-id="'+s.id+'">Rekap</button></td></tr>';
+    return '<tr><td><b>'+fmtDate(s.openTs)+'</b>'+(s.manual?' <span class="pill">manual</span>':'')+'<div class="sub">'+fmtTime(s.openTs)+' – '+fmtTime(s.closeTs)+'</div></td><td>'+esc(u?u.name:'-')+'</td><td class="r">'+rp(s.openCash)+'</td><td class="r">'+rp(x.total)+'</td><td class="r">'+rp(s.expectedCash)+'</td><td class="r">'+rp(s.closeCash)+'</td><td><span class="pill '+(d===0?'ok':d<0?'bad':'warn')+'">'+(d===0?'Cocok':(d>0?'Lebih ':'Kurang ')+rp(Math.abs(d)))+'</span></td><td class="r"><button class="btn sm ghost" data-act="shift-recap" data-id="'+s.id+'">Rekap</button>'+(s.manual&&S.user.role==='owner'?' <button class="btn sm ghost" data-act="bf-delshift" data-id="'+s.id+'" aria-label="Hapus rekap manual">'+ico('trash')+'</button>':'')+'</td></tr>';
   }).join('');
-  return cur+'<div class="card flush"><div style="padding:16px 18px 0"><h3>Riwayat shift</h3></div>'+(hist?'<div class="tablewrap"><table style="min-width:790px"><thead><tr><th>Tanggal</th><th>Kasir</th><th class="r">Kas awal</th><th class="r">Penjualan</th><th class="r">Seharusnya</th><th class="r">Dihitung</th><th>Selisih</th><th class="r">Laporan</th></tr></thead><tbody>'+hist+'</tbody></table></div>':empty('Belum ada shift yang ditutup','Riwayat muncul setelah shift pertama ditutup.'))+'</div>';
+  return cur+'<div class="card flush"><div class="card-h" style="padding:16px 18px 0"><h3>Riwayat shift</h3>'+(S.user.role==='owner'?'<button class="btn sm ghost" data-act="bf-open">'+ico('plus')+'Input rekap terlewat</button>':'')+'</div>'+(hist?'<div class="tablewrap"><table style="min-width:790px"><thead><tr><th>Tanggal</th><th>Kasir</th><th class="r">Kas awal</th><th class="r">Penjualan</th><th class="r">Seharusnya</th><th class="r">Dihitung</th><th>Selisih</th><th class="r">Laporan</th></tr></thead><tbody>'+hist+'</tbody></table></div>':empty('Belum ada shift yang ditutup','Riwayat muncul setelah shift pertama ditutup.'))+'</div>';
 };
 function cashMove(type){
   modal({title:type==='in'?'Kas masuk':'Kas keluar',body:'<div class="form"><div class="fld"><label class="lbl" for="cm-amt">Jumlah</label><input class="in" id="cm-amt" inputmode="numeric"></div><div class="fld"><label class="lbl" for="cm-note">Keterangan</label><input class="in" id="cm-note" placeholder="'+(type==='in'?'Contoh: Tambah uang kembalian':'Contoh: Beli es batu')+'"></div>'+fotoFieldHTML()+'<p class="muted" style="margin:0">'+(type==='in'?'Masuk ke Drawer.':'Diambil dari Dompet (saldo '+rp(Math.max(0,cashBal().dompet))+'); bila kurang, sisanya dari Drawer.')+'</p></div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="cash-save" data-v="'+type+'">Simpan</button>'});
