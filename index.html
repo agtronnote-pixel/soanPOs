@@ -444,6 +444,7 @@ function migrate(d){
   if(!Array.isArray(d.ingLog)){d.ingLog=[];ch=true}
   if(d.settings.blockOut===undefined){d.settings.blockOut=true;ch=true}
   if(!Array.isArray(d.cashLog)){d.cashLog=[];ch=true}
+  if(!Array.isArray(d.invoices)){d.invoices=[];ch=true}
   if(d.settings.drawerLimit===undefined){d.settings.drawerLimit=200000;ch=true}
   if((d.v||1)<2){
     if(d.demo&&!d.ingredients.length)demoIngredients(d.ingredients,d.ingLog,d.products,Date.now());
@@ -1208,8 +1209,10 @@ function expFormHTML(){
   if(K==='bahan'){
     const g=ingById(S.expIng)||ings[0];if(g)S.expIng=g.id;
     body='<div class="fld"><label class="lbl" for="exp-ing">Bahan yang dibeli</label><select class="sel" id="exp-ing" data-ch="exp-ing">'+ings.map(x=>'<option value="'+x.id+'"'+(g&&x.id===g.id?' selected':'')+'>'+esc(x.name)+' · stok '+fq(x.stock)+' '+esc(x.unit)+'</option>').join('')+'</select></div>'
-      +'<div class="fld-row"><div class="fld"><label class="lbl" for="exp-qty">Jumlah ('+esc(g?g.unit:'')+')</label><input class="in" id="exp-qty" data-in="exp-live" inputmode="decimal" placeholder="0"></div><div class="fld"><label class="lbl" for="fin-amt">Total bayar (Rp)</label><input class="in" id="fin-amt" data-in="exp-live" inputmode="numeric" placeholder="0"></div></div>'
-      +'<div class="fld"><label class="lbl" for="exp-note">Catatan (opsional)</label><input class="in" id="exp-note" placeholder="Contoh: Toko Sinar Jaya"></div>'
+      +'<div class="fld-row"><div class="fld"><label class="lbl" for="exp-qty">Jumlah ('+esc(g?g.unit:'')+')</label><input class="in" id="exp-qty" data-in="exp-live" inputmode="decimal" placeholder="0"></div><div class="fld"><label class="lbl" for="fin-amt">'+(S.expPay==='invoice'?'Total tagihan (Rp)':'Total bayar (Rp)')+'</label><input class="in" id="fin-amt" data-in="exp-live" inputmode="numeric" placeholder="0"></div></div>'
+      +'<div class="lbl" style="margin-top:2px">Pembayaran</div><div class="seg" role="group" aria-label="Pembayaran" style="margin-bottom:2px"><button class="'+(S.expPay!=='invoice'?'on':'')+'" data-act="exp-pay" data-v="tunai">Bayar tunai sekarang</button><button class="'+(S.expPay==='invoice'?'on':'')+'" data-act="exp-pay" data-v="invoice">Belum dibayar (invoice)</button></div>'
+      +(S.expPay==='invoice'?'<div class="fld-row"><div class="fld"><label class="lbl" for="inv-sup">Pemasok / toko</label><input class="in" id="inv-sup" list="inv-sups" placeholder="Contoh: Toko Sinar Jaya"><datalist id="inv-sups">'+invSuppliers().map(x=>'<option value="'+esc(x)+'">').join('')+'</datalist></div><div class="fld"><label class="lbl" for="inv-due">Jatuh tempo</label><input class="in" type="date" id="inv-due" value="'+isoDate(new Date(Date.now()+7*86400e3))+'"></div></div><div class="fld"><label class="lbl" for="exp-note">No. nota / catatan (opsional)</label><input class="in" id="exp-note" placeholder="Contoh: INV-0231"></div>'
+        :'<div class="fld"><label class="lbl" for="exp-note">Catatan (opsional)</label><input class="in" id="exp-note" placeholder="Contoh: Toko Sinar Jaya"></div>')
       +'<p class="muted" id="exp-info" style="margin:0">Stok '+esc(g?g.name:'bahan')+' akan bertambah dan HPP rata-rata diperbarui.</p>';
     if(!ings.length)body='<p class="muted">Belum ada bahan baku. Tambahkan dulu di Menu & Bahan, atau pilih "Lainnya".</p>';
   }else{
@@ -1218,11 +1221,13 @@ function expFormHTML(){
       +'<div class="fld"><label class="lbl" for="fin-ket">Keterangan</label><input class="in" id="fin-ket" list="exp-list" placeholder="Contoh: Bayar parkir"><datalist id="exp-list">'+rec.concat(EXP_QUICK.filter(q=>!rec.includes(q))).map(q=>'<option value="'+esc(q)+'">').join('')+'</datalist></div>'
       +'<div class="chips">'+EXP_QUICK.map(q=>'<button class="chip" type="button" data-act="exp-quick" data-v="'+esc(q)+'">'+esc(q)+'</button>').join('')+'</div>';
   }
+  if(K==='bahan'&&S.expPay==='invoice'&&ings.length)return seg+body+fotoFieldHTML().replace('Foto struk','Foto nota / invoice')+'<p class="muted" style="margin:0">Stok langsung bertambah, tapi uang belum keluar. Pembelian ini masuk daftar <b>Invoice belum dibayar</b> di Keuangan dan dibayar nanti dari sana.</p>';
   return seg+body+fotoFieldHTML()+'<p class="muted" style="margin:0">Diambil dari Dompet (saldo '+rp(Math.max(0,cashBal().dompet))+'); bila kurang, sisanya dari Drawer.'+(curShift()?' Tercatat juga sebagai kas keluar shift berjalan.':'')+'</p>';
 }
-function expOpen(){S.expKind=S.expKind||'lain';modal({title:'Catat pengeluaran',body:'<div class="form" id="exp-body">'+expFormHTML()+'</div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="exp-save">Simpan</button>'})}
+function expOpen(){S.expKind=S.expKind||'lain';S.expPay='tunai';modal({title:'Catat pengeluaran',body:'<div class="form" id="exp-body">'+expFormHTML()+'</div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="exp-save">Simpan</button>'})}
 function expRefresh(){const b=$('#exp-body');if(!b)return;const keep={amt:($('#fin-amt')||{}).value||'',foto:($('#fin-foto')||{}).value||''};b.innerHTML=expFormHTML();if($('#fin-amt'))$('#fin-amt').value=keep.amt;if($('#fin-foto'))$('#fin-foto').value=keep.foto}
 ACT['exp-kind']=el=>{S.expKind=el.dataset.v;expRefresh()};
+ACT['exp-pay']=el=>{const keep={q:($('#exp-qty')||{}).value||''};S.expPay=el.dataset.v;expRefresh();if($('#exp-qty'))$('#exp-qty').value=keep.q;INP['exp-live']()};
 CH['exp-ing']=el=>{S.expIng=el.value;expRefresh()};
 ACT['exp-quick']=el=>{const i=$('#fin-ket');if(i){i.value=el.dataset.v;i.focus()}};
 INP['exp-live']=()=>{const g=ingById(S.expIng),q=dec(($('#exp-qty')||{}).value),a=num(($('#fin-amt')||{}).value),o=$('#exp-info');if(!o||!g)return;
@@ -1233,8 +1238,17 @@ ACT['exp-save']=()=>{
   let label,o={foto};
   if(S.expKind==='bahan'){
     const g=ingById(S.expIng),q=dec(($('#exp-qty')||{}).value);if(!g){toast('Pilih bahan');return}if(q<=0){toast('Isi jumlah bahan yang dibeli');return}
+    const note=$('#exp-note').value.trim();
+    if(S.expPay==='invoice'){
+      const sup=($('#inv-sup').value||'').trim();if(!sup){toast('Isi nama pemasok / toko');$('#inv-sup').focus();return}
+      const due=$('#inv-due').value||'',c=a/q;g.cost=newAvgCost(g,q,c);g.stock=Math.round((g.stock+q)*1000)/1000;
+      logIng(g.id,'restock',q,'Invoice belum dibayar: '+sup+(note?' · '+note:''),Math.round(c*100)/100);
+      if(!Array.isArray(db.invoices))db.invoices=[];
+      db.invoices.push({id:uid(),ts:Date.now(),supplier:sup,iid:g.id,name:g.name,qty:q,unit:g.unit,jumlah:Math.round(a),due,note,foto,status:'open',userId:S.user?S.user.id:null});
+      save();closeModal();render();toast('Stok bertambah. Invoice '+rp(a)+' ke '+sup+' dicatat belum dibayar');return;
+    }
     const c=a/q;g.cost=newAvgCost(g,q,c);g.stock=Math.round((g.stock+q)*1000)/1000;
-    const note=$('#exp-note').value.trim();logIng(g.id,'restock',q,'Dibeli dari kas'+(note?': '+note:''),Math.round(c*100)/100);
+    logIng(g.id,'restock',q,'Dibeli dari kas'+(note?': '+note:''),Math.round(c*100)/100);
     label='Beli '+g.name+' ('+fq(q)+' '+g.unit+')'+(note?' · '+note:'');Object.assign(o,{kat:'bahan',iid:g.id,qty:q});
   }else{
     label=($('#fin-ket').value||'').trim();if(!label){toast('Isi keterangan, misalnya "Bayar parkir"');$('#fin-ket').focus();return}
@@ -1279,12 +1293,39 @@ VIEWS.finance=function(){
   return (log.length?'':'<div class="banner"><span><b>Mulai pencatatan kas.</b> Isi saldo awal uang di Drawer dan Dompet. Setelah itu penjualan tunai, kas masuk/keluar, dan pembatalan tercatat otomatis.</span><button class="btn sm primary" data-act="fin-adj">Isi saldo awal</button></div>')
    +'<div class="kpis"><div class="kpi hero"><span class="lbl">Uang di Drawer</span><span class="v">'+rp(b.drawer)+'</span><span class="muted" style="font-size:12px">Batas '+rp(lim)+' · lebihnya otomatis ke Dompet</span></div><div class="kpi"><span class="lbl">Uang di Dompet</span><span class="v">'+rp(b.dompet)+'</span><span class="muted" style="font-size:12px">Sumber tunai keluar</span></div><div class="kpi"><span class="lbl">Total kas tunai</span><span class="v">'+rp(b.drawer+b.dompet)+'</span></div></div>'
    +'<div class="toolbar"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="fin-out">'+ico('wallet')+'Catat pengeluaran</button><button class="btn ghost" data-act="fin-in">'+ico('plus')+'Catat pemasukan</button><button class="btn ghost" data-act="fin-move">Pindah kas</button><button class="btn ghost" data-act="fin-adj">Penyesuaian saldo</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn dark" data-act="fin-print">'+ico('receipt')+'Rekap kas</button><button class="btn ghost" data-act="fin-limit">Batas Drawer</button></div></div>'
+   +invoiceCardHTML()
    +'<div class="card flush"><div class="card-h" style="padding:16px 18px 0;flex-wrap:wrap;gap:10px"><h3>Jurnal kas tunai</h3><div class="chips">'+ranges.map(r=>chip('fin-range',r[0],r[1],F.range)).join('')+'</div><select class="sel" data-ch="fin-akun" aria-label="Filter kas" style="width:auto;flex:0 0 auto"><option value="all"'+(F.akun==='all'?' selected':'')+'>Drawer & Dompet</option><option value="drawer"'+(F.akun==='drawer'?' selected':'')+'>Drawer</option><option value="dompet"'+(F.akun==='dompet'?' selected':'')+'>Dompet</option></select><button class="btn sm ghost" data-act="fin-csv">'+ico('copy')+'Salin CSV</button></div>'
    +'<p class="muted" style="padding:6px 18px 0;margin:0;font-size:12px">Periode ini: Drawer +'+rp(sum('drawer','debit'))+' / −'+rp(sum('drawer','kredit'))+' · Dompet +'+rp(sum('dompet','debit'))+' / −'+rp(sum('dompet','kredit'))+'</p>'
    +(tr?'<div class="tablewrap"><table style="min-width:860px"><thead><tr><th>Tanggal</th><th>Kas</th><th class="r">Debit (masuk)</th><th class="r">Kredit (keluar)</th><th>Keterangan</th><th>Foto struk</th><th class="r">Saldo</th></tr></thead><tbody>'+tr+'</tbody></table></div>':'<p class="muted" style="padding:18px">Belum ada catatan kas pada periode ini.</p>')+'</div>'
    +expBreakdownHTML(a,z)
    +'<div class="card"><div class="card-h"><h3>Rekap penjualan per shift</h3><span class="muted">Siap cetak & kirim WhatsApp</span></div>'+(recRows||'<p class="muted">Belum ada shift.</p>')+'</div>';
 };
+/* ---- invoice: bahan sudah diterima, uang belum dibayar (utang ke pemasok) ---- */
+const invOpen=()=>(db.invoices||[]).filter(v=>v.status==='open').sort((a,b)=>(a.due||'9')<(b.due||'9')?-1:(a.due||'9')>(b.due||'9')?1:a.ts-b.ts);
+function invSuppliers(){const s=new Set();(db.invoices||[]).slice().reverse().forEach(v=>v.supplier&&s.add(v.supplier));return [...s].slice(0,12)}
+function invLabel(v){return 'Beli '+v.name+' ('+fq(v.qty)+' '+v.unit+')'}
+function invDue(v){if(!v.due)return '';const [y,m,d]=v.due.split('-').map(Number),t=new Date(y,m-1,d).getTime(),n=Math.round((t-sod(Date.now()))/86400e3);
+  return n<0?'<span class="pill bad">Lewat '+(-n)+' hari</span>':n===0?'<span class="pill warn">Jatuh tempo hari ini</span>':'<span class="pill">Jatuh tempo '+fmtDate(t)+'</span>'}
+function invoiceCardHTML(){
+  const op=invOpen(),paid=(db.invoices||[]).filter(v=>v.status==='paid').sort((a,b)=>b.paidTs-a.paidTs).slice(0,8);
+  if(!op.length&&!paid.length)return '';
+  const tot=op.reduce((t,v)=>t+v.jumlah,0);
+  const row=v=>{const u=userById(v.userId);return '<div class="list-row"><div class="l"><b>'+esc(v.supplier)+' · '+esc(invLabel(v))+'</b><span class="muted">Diterima '+fmtDate(v.ts)+(u?' · '+esc(u.name):'')+(v.note?' · '+esc(v.note):'')+(v.foto?' · <a href="'+esc(fotoHref(v.foto))+'" target="_blank" rel="noopener">nota</a>':'')+'</span>'+(v.status==='open'?'<span style="margin-top:4px">'+invDue(v)+'</span>':'<span class="muted">Lunas '+fmtDate(v.paidTs)+' · tunai</span>')+'</div><div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;justify-content:flex-end"><b class="num">'+rp(v.jumlah)+'</b>'+(v.status==='open'?'<button class="btn sm primary" data-act="inv-pay" data-id="'+v.id+'">Bayar</button><button class="icon-btn" data-act="inv-del" data-id="'+v.id+'" aria-label="Hapus invoice">'+ico('trash')+'</button>':'')+'</div></div>'};
+  return '<div class="card"><div class="card-h"><div><h3>Invoice belum dibayar</h3><span class="muted">Bahan sudah masuk stok, pembayaran ke pemasok menyusul</span></div><div style="text-align:right"><span class="lbl">Total utang</span><div class="num" style="font-weight:700;font-size:18px;color:var(--'+(tot?'bad':'ok')+')">'+rp(tot)+'</div></div></div>'
+   +(op.length?op.map(row).join(''):'<p class="muted">Semua invoice sudah lunas.</p>')
+   +(paid.length?'<details style="margin-top:8px"><summary class="muted" style="cursor:pointer">Sudah lunas ('+paid.length+' terakhir)</summary>'+paid.map(row).join('')+'</details>':'')+'</div>';
+}
+ACT['inv-pay']=el=>{const v=(db.invoices||[]).find(x=>x.id===el.dataset.id);if(!v||v.status!=='open')return;
+  const b=cashBal(),dp=Math.min(Math.max(0,b.dompet),v.jumlah),dr=v.jumlah-dp;
+  confirmBox('Bayar invoice',rp(v.jumlah)+' ke '+v.supplier+' untuk '+invLabel(v)+'. Diambil dari '+(dp&&dr?'Dompet '+rp(dp)+' + Drawer '+rp(dr):dp?'Dompet':'Drawer')+'. Stok tidak berubah lagi karena bahan sudah diterima.','Bayar',()=>{
+    const label='Bayar invoice '+v.supplier+' · '+invLabel(v)+(v.note?' · '+v.note:'');
+    const o={kat:'bahan',iid:v.iid,qty:v.qty,inv:v.id,label,foto:v.foto||''};
+    const sh=curShift(),mv=sh?{id:uid(),ts:Date.now(),type:'out',amount:v.jumlah,note:label}:null;if(mv){sh.moves.push(mv);o.ref=mv.id}
+    cashOut(v.jumlah,label,o);v.status='paid';v.paidTs=Date.now();v.paidBy=S.user?S.user.id:null;
+    save();render();toast('Invoice lunas'+(cashBal().drawer<0?'. Perhatian: saldo Drawer minus':''));
+  })};
+ACT['inv-del']=el=>{const v=(db.invoices||[]).find(x=>x.id===el.dataset.id);if(!v||v.status!=='open')return;
+  confirmBox('Hapus invoice','Invoice '+v.supplier+' '+rp(v.jumlah)+' dihapus dari daftar utang. Stok '+v.name+' yang sudah ditambahkan tidak dikurangi; koreksi stok di Menu & Bahan bila perlu.','Hapus',()=>{db.invoices=db.invoices.filter(x=>x!==v);save();render();toast('Invoice dihapus')},true)};
 function expBreakdownHTML(a,z){
   const ex=(db.cashLog||[]).filter(e=>e.jenis==='kredit'&&e.kat&&e.ts>=a&&e.ts<z),g={};
   ex.forEach(e=>{const k=e.kat==='bahan'?(ingById(e.iid)||{name:'Bahan'}).name:(e.label||e.ket);const key=e.kat+'|'+k.toLowerCase();const r=g[key]||(g[key]={kat:e.kat,name:k,v:0,n:new Set()});r.v+=e.jumlah;r.n.add(e.grp||e.id)});
@@ -1413,11 +1454,20 @@ function bfHTML(){
    +'<div class="fld"><label class="lbl" for="bf-kkn">Keterangan kas keluar</label><input class="in" id="bf-kkn" data-bf="kkNote" value="'+esc(B.kkNote||'')+'" placeholder="Contoh: Beli es batu"></div>'
    +'<p class="muted" id="bf-sum" style="margin:6px 0 0">'+bfSummary()+'</p><p class="muted" style="font-size:12px;margin:6px 0 0">Stok dan saldo Drawer/Dompet tidak diubah, karena kejadiannya sudah lewat.</p>';
 }
-function bfOpen(){
-  const y=new Date(Date.now()-86400e3);
-  S.bf={d1:isoDate(y),t1:'07:00',d2:isoDate(y),t2:'22:00',userId:(db.users.find(u=>u.role==='cashier')||db.users[0]).id,items:[{pid:'',name:'',qty:'',price:''}],pay:{},kasAwal:'',kasMasuk:'',kasKeluar:'',kkNote:'',aktual:null};
-  modal({title:'Input rekap terlewat',wide:true,body:'<div class="form" id="bf-body">'+bfHTML()+'</div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="bf-save">Simpan rekap</button>'});
+const hhmm=ts=>{const d=new Date(ts);return p2(d.getHours())+':'+p2(d.getMinutes())};
+function bfFromShift(sh){
+  const ss=db.sales.filter(s=>s.shiftId===sh.id&&s.status!=='void'),items=[],pay={};
+  ss.forEach(s=>{pay[s.method]=(pay[s.method]||0)+(+s.total||0);(s.items||[]).forEach(i=>{const pid=/^manual-/.test(i.pid)?'':i.pid,ex=items.find(x=>x.name===i.name&&+x.price===+i.price);if(ex)ex.qty=+ex.qty+(+i.qty||0);else items.push({pid,name:i.name,qty:+i.qty||0,price:+i.price||0})})});
+  const mv=t=>(sh.moves||[]).filter(m=>m.type===t),sum=a=>a.reduce((t,m)=>t+(+m.amount||0),0),out=mv('out');
+  const kk=out.map(m=>m.note).filter(n=>n&&n!=='Kas keluar (rekap manual)').join(', ');
+  return {editId:sh.id,d1:isoDate(new Date(sh.openTs)),t1:hhmm(sh.openTs),d2:isoDate(new Date(sh.closeTs)),t2:hhmm(sh.closeTs),userId:sh.userId,items:items.length?items:[{pid:'',name:'',qty:'',price:''}],pay,kasAwal:sh.openCash||'',kasMasuk:sum(mv('in'))||'',kasKeluar:sum(out)||'',kkNote:kk,aktual:sh.closeCash!==sh.expectedCash?sh.closeCash:null};
 }
+function bfOpen(id){
+  const y=new Date(Date.now()-86400e3),ed=id?db.shifts.find(x=>x.id===id&&x.manual):null;S.bfForce=false;
+  S.bf=ed?bfFromShift(ed):{d1:isoDate(y),t1:'07:00',d2:isoDate(y),t2:'22:00',userId:(S.user&&S.user.role==='cashier'?S.user:(db.users.find(u=>u.role==='cashier')||db.users[0])).id,items:[{pid:'',name:'',qty:'',price:''}],pay:{},kasAwal:'',kasMasuk:'',kasKeluar:'',kkNote:'',aktual:null};
+  modal({title:ed?'Ubah rekap terlewat':'Input rekap terlewat',wide:true,body:(ed&&ed.editTs?'<p class="muted" style="margin:0 0 8px;font-size:12px">Terakhir diubah '+fmtDT(ed.editTs)+(userById(ed.editBy)?' oleh '+esc(userById(ed.editBy).name):'')+'</p>':'')+'<div class="form" id="bf-body">'+bfHTML()+'</div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="bf-save">'+(ed?'Simpan perubahan':'Simpan rekap')+'</button>'});
+}
+ACT['bf-edit']=el=>bfOpen(el.dataset.id);
 const bfRender=()=>{const b=$('#bf-body');if(b)b.innerHTML=bfHTML()};
 ACT['bf-open']=()=>bfOpen();
 ACT['bf-add']=()=>{S.bf.items.push({pid:'',name:'',qty:'',price:''});$('#bf-rows').insertAdjacentHTML('beforeend',bfRowHTML(S.bf.items[S.bf.items.length-1],S.bf.items.length-1))};
@@ -1453,10 +1503,12 @@ ACT['bf-save']=()=>{
   const openTs=new Date(y1,m1-1,d1,h1,n1).getTime();let closeTs=new Date(y2,m2-1,d2,h2,n2).getTime();
   if(closeTs<=openTs){toast('Waktu tutup harus setelah waktu buka');return}
   if(closeTs>Date.now()){toast('Rekap terlewat harus di waktu yang sudah lewat');return}
-  const clash=db.shifts.find(x=>x.openTs<closeTs&&(x.closeTs||Date.now())>openTs);
+  const old=B.editId?db.shifts.find(x=>x.id===B.editId&&x.manual):null;if(B.editId&&!old){toast('Rekap ini sudah dihapus');closeModal();render();return}
+  const clash=db.shifts.find(x=>x!==old&&x.openTs<closeTs&&(x.closeTs||Date.now())>openTs);
   if(clash&&!S.bfForce){S.bfForce=true;toast('Waktu ini bertabrakan dengan shift lain ('+fmtDT(clash.openTs)+'). Tekan Simpan sekali lagi untuk tetap menyimpan.');return}
   S.bfForce=false;
-  const sh={id:uid(),userId:B.userId,openTs,openCash:+B.kasAwal||0,closeTs,closeCash:0,expectedCash:0,diff:0,note:'Input rekap manual',moves:[],manual:true};
+  const sh={id:old?old.id:uid(),userId:B.userId,openTs,openCash:+B.kasAwal||0,closeTs,closeCash:0,expectedCash:0,diff:0,note:'Input rekap manual',moves:[],manual:true,inputBy:old?(old.inputBy||null):(S.user?S.user.id:null)};
+  if(old){sh.editTs=Date.now();sh.editBy=S.user?S.user.id:null;db.sales=db.sales.filter(s=>s.shiftId!==old.id);db.shifts=db.shifts.filter(x=>x!==old)}
   if(+B.kasMasuk>0)sh.moves.push({id:uid(),ts:openTs+60000,type:'in',amount:+B.kasMasuk,note:'Kas masuk (rekap manual)'});
   if(+B.kasKeluar>0)sh.moves.push({id:uid(),ts:closeTs-60000,type:'out',amount:+B.kasKeluar,note:B.kkNote||'Kas keluar (rekap manual)'});
   const its=items.map(i=>{const p=prodById(i.pid);return{pid:i.pid||'manual-'+normName(i.name),name:String(i.name).trim(),price:+i.price||0,cost:p?unitCost(p):0,qty:+i.qty,note:'',rec:[]}});
@@ -1467,7 +1519,7 @@ ACT['bf-save']=()=>{
   });
   db.shifts.push(sh);
   const x=shiftStats(sh);sh.expectedCash=x.expected;sh.closeCash=B.aktual!=null?B.aktual:x.expected;sh.diff=sh.closeCash-sh.expectedCash;
-  save();closeModal();render();toast('Rekap tersimpan');recapModal(sh);
+  save();closeModal();render();toast(old?'Rekap diperbarui':'Rekap tersimpan');recapModal(sh);
 };
 ACT['bf-delshift']=el=>{const sh=db.shifts.find(x=>x.id===el.dataset.id);if(!sh||!sh.manual)return;
   confirmBox('Hapus rekap manual','Rekap '+fmtDate(sh.openTs)+' beserta transaksinya ('+db.sales.filter(s=>s.shiftId===sh.id).length+') akan dihapus. Hanya rekap yang diinput manual yang bisa dihapus.','Hapus',()=>{db.sales=db.sales.filter(s=>s.shiftId!==sh.id);db.shifts=db.shifts.filter(x=>x.id!==sh.id);save();render();toast('Rekap manual dihapus')})};
@@ -1481,9 +1533,9 @@ VIEWS.shift=function(){
   }
   const hist=db.shifts.filter(s=>s.closeTs).sort((a,b)=>b.closeTs-a.closeTs).slice(0,14).map(s=>{
     const x=shiftStats(s),u=userById(s.userId),d=s.diff||0;
-    return '<tr><td><b>'+fmtDate(s.openTs)+'</b>'+(s.manual?' <span class="pill">manual</span>':'')+'<div class="sub">'+fmtTime(s.openTs)+' – '+fmtTime(s.closeTs)+'</div></td><td>'+esc(u?u.name:'-')+'</td><td class="r">'+rp(s.openCash)+'</td><td class="r">'+rp(x.total)+'</td><td class="r">'+rp(s.expectedCash)+'</td><td class="r">'+rp(s.closeCash)+'</td><td><span class="pill '+(d===0?'ok':d<0?'bad':'warn')+'">'+(d===0?'Cocok':(d>0?'Lebih ':'Kurang ')+rp(Math.abs(d)))+'</span></td><td class="r"><button class="btn sm ghost" data-act="shift-recap" data-id="'+s.id+'">Rekap</button>'+(s.manual&&S.user.role==='owner'?' <button class="btn sm ghost" data-act="bf-delshift" data-id="'+s.id+'" aria-label="Hapus rekap manual">'+ico('trash')+'</button>':'')+'</td></tr>';
+    return '<tr><td><b>'+fmtDate(s.openTs)+'</b>'+(s.manual?' <span class="pill">manual</span>':'')+'<div class="sub">'+fmtTime(s.openTs)+' – '+fmtTime(s.closeTs)+'</div></td><td>'+esc(u?u.name:'-')+'</td><td class="r">'+rp(s.openCash)+'</td><td class="r">'+rp(x.total)+'</td><td class="r">'+rp(s.expectedCash)+'</td><td class="r">'+rp(s.closeCash)+'</td><td><span class="pill '+(d===0?'ok':d<0?'bad':'warn')+'">'+(d===0?'Cocok':(d>0?'Lebih ':'Kurang ')+rp(Math.abs(d)))+'</span></td><td class="r"><button class="btn sm ghost" data-act="shift-recap" data-id="'+s.id+'">Rekap</button>'+(s.manual?' <button class="btn sm ghost" data-act="bf-edit" data-id="'+s.id+'">Ubah</button>':'')+(s.manual&&S.user.role==='owner'?' <button class="btn sm ghost" data-act="bf-delshift" data-id="'+s.id+'" aria-label="Hapus rekap manual">'+ico('trash')+'</button>':'')+'</td></tr>';
   }).join('');
-  return cur+'<div class="card flush"><div class="card-h" style="padding:16px 18px 0"><h3>Riwayat shift</h3>'+(S.user.role==='owner'?'<button class="btn sm ghost" data-act="bf-open">'+ico('plus')+'Input rekap terlewat</button>':'')+'</div>'+(hist?'<div class="tablewrap"><table style="min-width:790px"><thead><tr><th>Tanggal</th><th>Kasir</th><th class="r">Kas awal</th><th class="r">Penjualan</th><th class="r">Seharusnya</th><th class="r">Dihitung</th><th>Selisih</th><th class="r">Laporan</th></tr></thead><tbody>'+hist+'</tbody></table></div>':empty('Belum ada shift yang ditutup','Riwayat muncul setelah shift pertama ditutup.'))+'</div>';
+  return cur+'<div class="card flush"><div class="card-h" style="padding:16px 18px 0"><h3>Riwayat shift</h3>'+'<button class="btn sm ghost" data-act="bf-open">'+ico('plus')+'Input rekap terlewat</button>'+'</div>'+(hist?'<div class="tablewrap"><table style="min-width:790px"><thead><tr><th>Tanggal</th><th>Kasir</th><th class="r">Kas awal</th><th class="r">Penjualan</th><th class="r">Seharusnya</th><th class="r">Dihitung</th><th>Selisih</th><th class="r">Laporan</th></tr></thead><tbody>'+hist+'</tbody></table></div>':empty('Belum ada shift yang ditutup','Riwayat muncul setelah shift pertama ditutup.'))+'</div>';
 };
 function cashMove(type){
   modal({title:type==='in'?'Kas masuk':'Kas keluar',body:'<div class="form"><div class="fld"><label class="lbl" for="cm-amt">Jumlah</label><input class="in" id="cm-amt" inputmode="numeric"></div><div class="fld"><label class="lbl" for="cm-note">Keterangan</label><input class="in" id="cm-note" placeholder="'+(type==='in'?'Contoh: Tambah uang kembalian':'Contoh: Beli es batu')+'"></div>'+fotoFieldHTML()+'<p class="muted" style="margin:0">'+(type==='in'?'Masuk ke Drawer.':'Diambil dari Dompet (saldo '+rp(Math.max(0,cashBal().dompet))+'); bila kurang, sisanya dari Drawer.')+'</p></div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="cash-save" data-v="'+type+'">Simpan</button>'});
@@ -2224,7 +2276,7 @@ document.addEventListener('keydown',e=>{
    {k, j, del, u, dev}. Perangkat hanya mengirim data yang berubah dan hanya mengambil perubahan
    sejak sinkron terakhir, jadi tetap jalan saat koneksi ke server putus. */
 const SYNC_KEY='soankofe.pos.sync',SYNC_BASE='soankofe.pos.syncbase';
-const SYNC_COLLS=['users','categories','products','customers','sales','held','stockLog','ingredients','ingLog','shifts','cashLog'];
+const SYNC_COLLS=['users','categories','products','customers','sales','held','stockLog','ingredients','ingLog','shifts','cashLog','invoices'];
 const SG={info:null,cfg:null,base:{},api:null,mode:null,unsub:null,state:'off',err:'',lastOk:0,timer:null,rTimer:null,retry:null,started:false,files:null};
 function syncCfgLoad(){try{SG.cfg=JSON.parse(lsGet(SYNC_KEY)||'null')}catch(e){SG.cfg=null}try{SG.base=JSON.parse(lsGet(SYNC_BASE)||'{}')||{}}catch(e){SG.base={}}}
 function syncCfgSave(){lsSet(SYNC_KEY,JSON.stringify(SG.cfg))}
