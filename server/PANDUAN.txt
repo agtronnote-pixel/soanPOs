@@ -1,0 +1,82 @@
+SOAN KOFE POS - SERVER LOKAL
+============================
+
+Satu komputer di kedai menjadi pusat data. Tablet, laptop, dan HP yang tersambung
+ke WiFi kedai membuka aplikasi dari komputer itu dan datanya selalu sama (real-time).
+Tidak butuh internet. Server juga menyimpan gambar, dokumen, dan laporan CSV.
+
+
+A. PASANG SEKALI DI KOMPUTER SERVER
+-----------------------------------
+1. Pasang Node.js: buka https://nodejs.org, unduh versi "LTS", lalu pasang seperti
+   aplikasi biasa (Next, Next, Install).
+2. Ekstrak folder SoanKofe-Server ke tempat yang aman, misalnya Dokumen.
+   Jangan dihapus: data toko tersimpan di dalam folder "data" di sini.
+
+
+B. MENYALAKAN SERVER (setiap hari buka kedai)
+---------------------------------------------
+Mac     : klik dua kali "Jalankan-Server-Mac.command".
+          Pertama kali, kalau Mac menolak membuka: klik kanan file itu > Open > Open.
+          Kalau muncul pertanyaan "izinkan koneksi masuk", pilih Allow / Izinkan.
+Windows : klik dua kali "Jalankan-Server-Windows.bat".
+          Kalau Windows Firewall bertanya, centang "Private networks" lalu Allow access.
+
+Jendela hitam akan menampilkan alamat, contoh:
+     http://192.168.1.10:8080
+Biarkan jendela itu terbuka selama kedai beroperasi. Menutupnya = server mati.
+(Di Mac, server otomatis mencegah Mac tertidur selama jendela terbuka.
+ Tetap hubungkan laptop ke charger.)
+
+
+C. PINDAHKAN DATA TABLET YANG SUDAH BERJALAN (sekali saja)
+----------------------------------------------------------
+Alamat server berbeda dari link GitHub, jadi data tablet perlu dipindah sekali:
+1. Di tablet, buka aplikasi LAMA (link GitHub) > masuk Owner > Pengaturan > Data >
+   Cadangkan data > Unduh. File soan-kofe-cadangan-....json tersimpan.
+2. Di tablet, buka alamat server (contoh http://192.168.1.10:8080) di Chrome.
+3. Masuk sebagai Owner (PIN data contoh: 1234) > Pengaturan > Data >
+   Pulihkan dari cadangan > pilih file .json tadi.
+4. Masih di Pengaturan: Sinkron antar perangkat > Aktifkan sinkron.
+   Buat kode toko (contoh: soankofe-lebakbulus-27) > Lanjut > "Unggah data ini".
+   Header berubah menjadi "Tersinkron".
+
+
+D. SAMBUNGKAN LAPTOP DAN HP
+---------------------------
+1. Pastikan tersambung ke WiFi kedai yang sama.
+2. Buka alamat server di browser > masuk Owner > Pengaturan >
+   Aktifkan sinkron > masukkan KODE YANG SAMA > "Ambil data toko".
+3. Pasang sebagai aplikasi:
+   - Tablet/HP Android (Chrome): menu titik tiga > Tambahkan ke layar utama.
+   - iPad/iPhone (Safari): tombol Bagikan > Tambah ke Layar Utama.
+   - Laptop server sendiri: buka http://localhost:8080 di Chrome > ikon Install di kolom alamat.
+   - Laptop lain (Chrome): menu titik tiga > Simpan dan bagikan > Buat pintasan >
+     centang "Buka sebagai jendela".
+
+
+E. BERKAS DAN LAPORAN
+---------------------
+Pengaturan > Berkas & laporan:
+- Laporan penjualan harian (penjualan-TANGGAL.csv) dan rekap bulanan
+  (rekap-bulanan-BULAN.csv) dibuat otomatis setiap ada transaksi. Bisa dibuka di Excel.
+- Unggah gambar (foto menu, nota) atau dokumen; bisa dilihat dan diunduh dari perangkat mana pun.
+Di komputer server, semuanya ada di folder:  data/files/laporan, data/files/gambar, data/files/dokumen.
+
+
+F. KEAMANAN DATA
+----------------
+- Server menyimpan cadangan otomatis setiap hari di folder data/cadangan (60 hari terakhir).
+- Salin folder "data" ke flashdisk atau Google Drive seminggu sekali.
+- Kalau server mati sebentar, tablet tetap bisa berjualan. Header menampilkan "Offline",
+  dan transaksi otomatis terkirim begitu server menyala lagi.
+
+
+G. MASALAH UMUM
+---------------
+- Perangkat tidak bisa membuka alamat server:
+  pastikan WiFi sama, jendela server masih terbuka, dan alamatnya sesuai yang tertulis
+  di jendela server (alamat bisa berubah kalau router dinyalakan ulang).
+  Agar alamat tetap, minta "IP reservation / DHCP static" untuk komputer server di pengaturan router.
+- "Kode toko salah": ketik kode yang sama persis dengan perangkat pertama.
+- Memperbarui aplikasi: ganti isi folder "app" dengan versi baru. Folder "data" jangan disentuh.
