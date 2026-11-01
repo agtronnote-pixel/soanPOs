@@ -1635,7 +1635,7 @@ document.addEventListener('keydown',e=>{
    sejak sinkron terakhir, jadi tetap jalan saat koneksi ke server putus. */
 const SYNC_KEY='soankofe.pos.sync',SYNC_BASE='soankofe.pos.syncbase';
 const SYNC_COLLS=['users','categories','products','customers','sales','held','stockLog','ingredients','ingLog','shifts'];
-const SG={cfg:null,base:{},api:null,mode:null,unsub:null,state:'off',err:'',lastOk:0,timer:null,rTimer:null,retry:null,started:false,files:null};
+const SG={info:null,cfg:null,base:{},api:null,mode:null,unsub:null,state:'off',err:'',lastOk:0,timer:null,rTimer:null,retry:null,started:false,files:null};
 function syncCfgLoad(){try{SG.cfg=JSON.parse(lsGet(SYNC_KEY)||'null')}catch(e){SG.cfg=null}try{SG.base=JSON.parse(lsGet(SYNC_BASE)||'{}')||{}}catch(e){SG.base={}}}
 function syncCfgSave(){lsSet(SYNC_KEY,JSON.stringify(SG.cfg))}
 function syncBaseSave(){lsSet(SYNC_BASE,JSON.stringify(SG.base))}
@@ -1810,7 +1810,10 @@ const fmtSize=n=>n<1024?n+' B':n<1048576?(n/1024).toFixed(0)+' KB':(n/1048576).t
 function filesCardHTML(){
   if(!syncOn())return '<div class="card"><div class="card-h"><h3>Berkas &amp; laporan</h3></div><p class="muted">Aktifkan sinkron dulu untuk menyimpan gambar, dokumen, dan laporan CSV di server kedai.</p></div>';
   return '<div class="card"><div class="card-h"><h3>Berkas &amp; laporan</h3><button class="btn sm ghost" data-act="files-refresh">Muat ulang</button></div><div class="form">'
-   +'<p class="muted">Laporan penjualan harian dan rekap bulanan (CSV, bisa dibuka di Excel) dibuat otomatis oleh server. Gambar dan dokumen yang diunggah tersimpan di komputer server.</p>'
+   +'<h4 style="margin:0 0 4px">Cadangan</h4><div id="bk-status">'+backupStatusHTML()+'</div>'
+   +'<a class="btn ghost" href="api/backup.zip?code='+encodeURIComponent(fileCode())+'" download data-act="bk-zip">Unduh cadangan lengkap ke perangkat ini (.zip)</a>'
+   +'<p class="muted" style="margin-top:4px">Berisi semua data toko, laporan, gambar, dan dokumen. Tersimpan di folder Download perangkat ini. Simpan juga ke Google Drive dari HP bila perlu.</p>'
+   +'<h4 style="margin:14px 0 4px">Berkas</h4><p class="muted">Laporan penjualan harian dan rekap bulanan (CSV, bisa dibuka di Excel) dibuat otomatis oleh server. Gambar dan dokumen yang diunggah tersimpan di komputer server.</p>'
    +'<div class="fld"><label class="lbl" for="up-folder">Unggah ke</label><select class="in" id="up-folder"><option value="gambar">Gambar</option><option value="dokumen">Dokumen</option><option value="laporan">Laporan</option></select></div>'
    +'<input type="file" id="up-file" multiple data-ch="file-up" style="display:none"><button class="btn ghost" data-act="file-pick">'+ico('plus')+'Pilih berkas untuk diunggah</button>'
    +'<div id="file-list">'+filesListHTML()+'</div></div></div>';
@@ -1826,8 +1829,20 @@ function filesListHTML(){
 }
 async function filesLoad(){
   try{const r=await fetch('api/files',{headers:{'x-store-code':fileCode()},cache:'no-store'});if(!r.ok)throw 0;SG.files=await r.json()}catch(e){SG.files=false}
+  try{const r=await fetch('api/info',{cache:'no-store'});SG.info=r.ok?await r.json():null}catch(e){SG.info=null}
   const el=$('#file-list');if(el)el.innerHTML=filesListHTML();
+  const bk=$('#bk-status');if(bk)bk.innerHTML=backupStatusHTML();
 }
+function backupStatusHTML(){
+  const i=SG.info;if(!i)return '<p class="muted">Memuat status cadangan…</p>';
+  const d=i.drive||{};
+  const drv=d.on?'<span class="pill ok">Google Drive aktif</span> Disalin otomatis ke <b>'+esc(d.folder||'Google Drive')+'</b>'+(d.last?', terakhir '+fmtDT(d.last):'')+' ('+(d.files||0)+' berkas + data).'
+    :d.err?'<span class="pill bad">Google Drive gagal</span> '+esc(d.err)
+    :'<span class="pill amber">Google Drive belum terpasang</span> Pasang Google Drive for desktop di komputer server agar data dicadangkan otomatis.';
+  return '<p class="muted">'+drv+'</p><p class="muted">Komputer server juga menyimpan cadangan harian 60 hari terakhir.</p>'+(d.on?'<button class="btn sm ghost" data-act="bk-drive">Cadangkan ke Google Drive sekarang</button>':'');
+}
+ACT['bk-zip']=()=>toast('Menyiapkan cadangan lengkap…');
+ACT['bk-drive']=async()=>{toast('Mencadangkan ke Google Drive…');try{const r=await fetch('api/drive/now',{method:'POST',headers:{'x-store-code':fileCode()}});const j=await r.json();toast(j.ok?'Cadangan Google Drive selesai':'Gagal: '+(j.err||'tidak diketahui'))}catch(e){toast('Server tidak terjangkau')}filesLoad()};
 ACT['files-refresh']=()=>{SG.files=null;const el=$('#file-list');if(el)el.innerHTML=filesListHTML()};
 ACT['file-pick']=()=>{const i=$('#up-file');if(i)i.click()};
 CH['file-up']=async el=>{

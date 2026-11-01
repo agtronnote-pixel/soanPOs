@@ -5,9 +5,9 @@
    Tidak butuh internet dan tidak butuh paket tambahan: cukup Node.js versi 18 ke atas.
    Jalankan:  node server.js        (port bawaan 8080, ubah dengan PORT=9000 node server.js) */
 'use strict';
-const http = require('http'), fs = require('fs'), path = require('path'), os = require('os'), url = require('url');
+const http = require('http'), fs = require('fs'), path = require('path'), os = require('os'), url = require('url'), zlib = require('zlib');
 
-const VERSION = '1.0.0';
+const VERSION = '1.1.0';
 const PORT = +process.env.PORT || 8080;
 const HERE = __dirname;
 const APP_DIR = [path.join(HERE, 'app'), path.join(HERE, '..')].find(d => fs.existsSync(path.join(d, 'index.html')));
@@ -17,6 +17,12 @@ const BACKUP_DIR = path.join(DATA_DIR, 'cadangan');
 const STORE_FILE = path.join(DATA_DIR, 'store.json');
 const FOLDERS = ['gambar', 'laporan', 'dokumen'];
 [DATA_DIR, FILE_DIR, BACKUP_DIR, ...FOLDERS.map(f => path.join(FILE_DIR, f))].forEach(d => fs.mkdirSync(d, { recursive: true }));
+
+/* ---------- pengaturan opsional (pengaturan.json di samping server.js) ----------
+   { "folderCadangan": "/Users/nama/Library/CloudStorage/GoogleDrive-email/My Drive" }
+   Bila kosong, server mencari folder Google Drive for desktop secara otomatis. */
+let CFG = {};
+try { CFG = JSON.parse(fs.readFileSync(path.join(HERE, 'pengaturan.json'), 'utf8')); } catch (e) {}
 
 /* ---------- penyimpanan data ---------- */
 let store = { code: null, clock: 0, items: {} };
@@ -34,13 +40,92 @@ function saveStore(now) {
     if (!fs.existsSync(bk)) { fs.copyFileSync(STORE_FILE, bk); pruneBackups(); }
   };
   if (now) doSave(); else saveTimer = setTimeout(doSave, 300);
+  queueDrive();
 }
 function pruneBackups() {
-  const list = fs.readdirSync(BACKUP_DIR).filter(f => /^data-\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort();
-  while (list.length > 60) fs.unlinkSync(path.join(BACKUP_DIR, list.shift()));
+  pruneDir(BACKUP_DIR);
+}
+function pruneDir(dir) {
+  const list = fs.readdirSync(dir).filter(f => /^data-\d{4}-\d{2}-\d{2}\.json$/.test(f)).sort();
+  while (list.length > 60) fs.unlinkSync(path.join(dir, list.shift()));
 }
 const tick = () => (store.clock = Math.max(store.clock + 1, Date.now()));
 const since = ms => Object.values(store.items).filter(x => x.u > ms).sort((a, b) => a.u - b.u);
+
+/* ---------- cadangan otomatis ke Google Drive ----------
+   Pasang "Google Drive for desktop" di komputer server dan login. Server menyalin:
+   SoanKofe-Cadangan/data/data-terbaru.json, data-TANGGAL.json (60 hari), dan cermin folder berkas. */
+const drive = { root: null, last: 0, err: null, files: 0 };
+const isDir = p => { try { return fs.statSync(p).isDirectory(); } catch (e) { return false; } };
+function findDrive() {
+  const fixed = CFG.folderCadangan || process.env.SOAN_DRIVE;
+  if (fixed) return isDir(fixed) ? fixed : null;
+  const subs = ['My Drive', 'Drive Saya'], home = os.homedir(), c = [];
+  const cs = path.join(home, 'Library', 'CloudStorage');
+  try { for (const d of fs.readdirSync(cs)) if (/^GoogleDrive/i.test(d)) subs.forEach(s => c.push(path.join(cs, d, s))); } catch (e) {}
+  if (process.platform === 'win32') for (const L of 'GHIJKLMNOPQRSTUVWXYZDEF') subs.forEach(s => c.push(L + ':\\' + s));
+  subs.forEach(s => c.push(path.join(home, 'Google Drive', s)));
+  return c.find(isDir) || null;
+}
+let driveTimer = null;
+function queueDrive() { clearTimeout(driveTimer); driveTimer = setTimeout(driveBackup, 30000); }
+function driveBackup() {
+  clearTimeout(driveTimer);
+  const root = findDrive();
+  if (!root) { drive.root = null; drive.err = null; return; }
+  const T = path.join(root, 'SoanKofe-Cadangan');
+  try {
+    fs.mkdirSync(path.join(T, 'data'), { recursive: true });
+    if (fs.existsSync(STORE_FILE)) {
+      fs.copyFileSync(STORE_FILE, path.join(T, 'data', 'data-terbaru.json'));
+      fs.copyFileSync(STORE_FILE, path.join(T, 'data', 'data-' + new Date().toISOString().slice(0, 10) + '.json'));
+      pruneDir(path.join(T, 'data'));
+    }
+    let n = 0;
+    for (const f of FOLDERS) {
+      const src = path.join(FILE_DIR, f), dst = path.join(T, 'berkas', f);
+      fs.mkdirSync(dst, { recursive: true });
+      for (const name of fs.readdirSync(src)) {
+        const a = path.join(src, name), b = path.join(dst, name), sa = fs.statSync(a);
+        if (!sa.isFile()) continue;
+        let same = false; try { const sb = fs.statSync(b); same = sb.size === sa.size && Math.abs(sb.mtimeMs - sa.mtimeMs) < 2000; } catch (e) {}
+        if (!same) { fs.copyFileSync(a, b); fs.utimesSync(b, sa.atime, sa.mtime); }
+        n++;
+      }
+    }
+    Object.assign(drive, { root: T, last: Date.now(), err: null, files: n });
+  } catch (e) { Object.assign(drive, { root: T, err: e.message }); console.error('Cadangan Google Drive gagal:', e.message); }
+}
+setInterval(driveBackup, 10 * 60 * 1000);
+
+/* ---------- arsip .zip (tanpa paket tambahan) ---------- */
+const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+const crc32 = buf => { let c = 0xffffffff; for (let i = 0; i < buf.length; i++) c = CRC[(c ^ buf[i]) & 0xff] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+function makeZip(entries) {
+  const parts = [], central = []; let off = 0;
+  const now = new Date(), dt = ((now.getHours() << 11) | (now.getMinutes() << 5) | (now.getSeconds() >> 1)) & 0xffff, dd = (((now.getFullYear() - 1980) << 9) | ((now.getMonth() + 1) << 5) | now.getDate()) & 0xffff;
+  for (const e of entries) {
+    const name = Buffer.from(e.name, 'utf8'), raw = e.data, crc = crc32(raw), comp = zlib.deflateRawSync(raw), useC = comp.length < raw.length, body = useC ? comp : raw;
+    const h = Buffer.alloc(30); h.writeUInt32LE(0x04034b50, 0); h.writeUInt16LE(20, 4); h.writeUInt16LE(0x0800, 6); h.writeUInt16LE(useC ? 8 : 0, 8); h.writeUInt16LE(dt, 10); h.writeUInt16LE(dd, 12);
+    h.writeUInt32LE(crc, 14); h.writeUInt32LE(body.length, 18); h.writeUInt32LE(raw.length, 22); h.writeUInt16LE(name.length, 26); h.writeUInt16LE(0, 28);
+    parts.push(h, name, body);
+    const c = Buffer.alloc(46); c.writeUInt32LE(0x02014b50, 0); c.writeUInt16LE(20, 4); c.writeUInt16LE(20, 6); c.writeUInt16LE(0x0800, 8); c.writeUInt16LE(useC ? 8 : 0, 10); c.writeUInt16LE(dt, 12); c.writeUInt16LE(dd, 14);
+    c.writeUInt32LE(crc, 16); c.writeUInt32LE(body.length, 20); c.writeUInt32LE(raw.length, 24); c.writeUInt16LE(name.length, 28); c.writeUInt32LE(off, 42);
+    central.push(c, name); off += 30 + name.length + body.length;
+  }
+  const cd = Buffer.concat(central), end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0); end.writeUInt16LE(entries.length, 8); end.writeUInt16LE(entries.length, 10); end.writeUInt32LE(cd.length, 12); end.writeUInt32LE(off, 16);
+  return Buffer.concat([...parts, cd, end]);
+}
+function backupZip() {
+  saveStore(true);
+  const entries = [{ name: 'data/store.json', data: fs.readFileSync(STORE_FILE) }];
+  for (const f of FOLDERS) for (const name of fs.readdirSync(path.join(FILE_DIR, f))) {
+    const p = path.join(FILE_DIR, f, name); if (fs.statSync(p).isFile()) entries.push({ name: 'data/files/' + f + '/' + name, data: fs.readFileSync(p) });
+  }
+  entries.push({ name: 'BACA-SAYA.txt', data: Buffer.from('Cadangan lengkap Soan Kofe POS (' + new Date().toLocaleString('id-ID') + ').\r\n\r\nCara memulihkan server: matikan server, ekstrak arsip ini ke folder SoanKofe-Server sehingga folder "data" tertimpa, lalu nyalakan server lagi.\r\nIsi: data/store.json (semua data toko) dan data/files (laporan, gambar, dokumen).\r\n') });
+  return makeZip(entries);
+}
 
 /* ---------- real-time (Server-Sent Events) ---------- */
 const clients = new Set();
@@ -90,7 +175,7 @@ function queueCsv(days) {
     const months = new Set();
     for (const d of dirtyDays) { try { writeDailyCsv(d); months.add(d.slice(0, 7)); } catch (e) { console.error('CSV gagal', d, e.message); } }
     for (const m of months) { try { writeMonthlyRecap(m); } catch (e) { console.error('Rekap gagal', m, e.message); } }
-    dirtyDays.clear();
+    dirtyDays.clear(); queueDrive();
   }, 1500);
 }
 function rebuildAllCsv() { const days = new Set(parsed('sales~').filter(s => s.ts).map(s => dayOf(s.ts))); queueCsv([...days]); }
@@ -132,7 +217,7 @@ function listFiles() {
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true), p = decodeURIComponent(u.pathname), q = u.query;
   try {
-    if (p === '/api/info') return send(res, 200, { name: 'soan-server', version: VERSION, hasData: !!store.code, items: Object.keys(store.items).length });
+    if (p === '/api/info') return send(res, 200, { name: 'soan-server', version: VERSION, hasData: !!store.code, items: Object.keys(store.items).length, drive: { on: !!drive.root && !drive.err, last: drive.last, err: drive.err, files: drive.files, folder: drive.root ? path.basename(path.dirname(drive.root)) + '/SoanKofe-Cadangan' : null } });
 
     if (p.startsWith('/api/')) {
       const auth = checkCode(req, q);
@@ -172,15 +257,21 @@ const server = http.createServer(async (req, res) => {
         const body = await readBody(req, 100e6);
         let target = path.join(FILE_DIR, folder, name);
         if (fs.existsSync(target)) { const ext = path.extname(name), base = name.slice(0, name.length - ext.length); let i = 2; while (fs.existsSync(path.join(FILE_DIR, folder, base + ' (' + i + ')' + ext))) i++; name = base + ' (' + i + ')' + ext; target = path.join(FILE_DIR, folder, name); }
-        fs.writeFileSync(target, body);
+        fs.writeFileSync(target, body); queueDrive();
         return send(res, 200, { ok: true, folder, name });
       }
       if (p === '/api/files' && req.method === 'DELETE') {
         const folder = FOLDERS.includes(q.folder) ? q.folder : null, name = safeName(q.name);
         if (!folder || !name) return send(res, 400, { error: 'Berkas tidak valid' });
-        const target = path.join(FILE_DIR, folder, name); if (fs.existsSync(target)) fs.unlinkSync(target);
+        const target = path.join(FILE_DIR, folder, name); if (fs.existsSync(target)) fs.unlinkSync(target); queueDrive();
         return send(res, 200, { ok: true });
       }
+      if (p === '/api/backup.zip') {
+        const z = backupZip(), d = new Date(), nm = 'SoanKofe-cadangan-' + dayOf(d) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.zip';
+        res.writeHead(200, { 'content-type': 'application/zip', 'content-length': z.length, 'content-disposition': 'attachment; filename="' + nm + '"', 'cache-control': 'no-store' });
+        return res.end(z);
+      }
+      if (p === '/api/drive/now' && req.method === 'POST') { driveBackup(); return send(res, 200, { ok: !drive.err, err: drive.err }); }
       if (p === '/api/reports/rebuild' && req.method === 'POST') { rebuildAllCsv(); return send(res, 200, { ok: true }); }
       return send(res, 404, { error: 'Tidak ditemukan' });
     }
@@ -215,6 +306,8 @@ server.listen(PORT, '0.0.0.0', () => {
   (ips.length ? ips : ['(belum tersambung ke jaringan)']).forEach(ip => console.log('     http://' + ip + ':' + PORT));
   console.log('  Di komputer ini sendiri:  http://localhost:' + PORT);
   console.log('  Data & berkas disimpan di: ' + DATA_DIR);
+  driveBackup();
+  console.log('  ' + (drive.root ? 'Cadangan Google Drive: ' + drive.root : 'Google Drive for desktop tidak ditemukan; cadangan hanya di komputer ini.'));
   console.log('  ' + (store.code ? 'Data toko: ' + Object.keys(store.items).length + ' catatan.' : 'Belum ada data toko. Aktifkan sinkron dari tablet kasir.'));
   console.log('  Biarkan jendela ini terbuka selama kedai beroperasi.\n');
 });

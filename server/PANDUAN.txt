@@ -12,6 +12,9 @@ A. PASANG SEKALI DI KOMPUTER SERVER
    aplikasi biasa (Next, Next, Install).
 2. Ekstrak folder SoanKofe-Server ke tempat yang aman, misalnya Dokumen.
    Jangan dihapus: data toko tersimpan di dalam folder "data" di sini.
+3. Pasang "Google Drive for desktop" (https://www.google.com/drive/download/)
+   lalu login dengan akun Google kedai. Server akan menemukannya otomatis dan
+   mencadangkan data + semua berkas ke folder Google Drive "SoanKofe-Cadangan".
 
 
 B. MENYALAKAN SERVER (setiap hari buka kedai)
@@ -64,10 +67,29 @@ Pengaturan > Berkas & laporan:
 Di komputer server, semuanya ada di folder:  data/files/laporan, data/files/gambar, data/files/dokumen.
 
 
-F. KEAMANAN DATA
-----------------
-- Server menyimpan cadangan otomatis setiap hari di folder data/cadangan (60 hari terakhir).
-- Salin folder "data" ke flashdisk atau Google Drive seminggu sekali.
+F. CADANGAN DATA (3 LAPIS)
+--------------------------
+1. Komputer server : cadangan harian otomatis di folder data/cadangan (60 hari terakhir).
+2. Google Drive    : otomatis setiap ada perubahan (paling lambat 30 detik) dan tiap 10 menit,
+                     ke folder Google Drive "SoanKofe-Cadangan":
+                       data/data-terbaru.json, data/data-TANGGAL.json (60 hari),
+                       berkas/laporan, berkas/gambar, berkas/dokumen.
+                     Status terlihat di Pengaturan > Berkas & laporan > Cadangan.
+3. Perangkat       : Pengaturan > Berkas & laporan > "Unduh cadangan lengkap ke perangkat ini (.zip)".
+                     File masuk ke folder Download tablet/HP/laptop. Lakukan seminggu sekali.
+
+Folder Google Drive tidak terdeteksi? Buat file pengaturan.json di samping server.js berisi:
+   { "folderCadangan": "ALAMAT FOLDER GOOGLE DRIVE" }
+   contoh Mac    : "/Users/nama/Library/CloudStorage/GoogleDrive-email@gmail.com/My Drive"
+   contoh Windows: "G:\\My Drive"
+lalu nyalakan ulang server.
+
+MEMULIHKAN SERVER (misalnya komputer server rusak/diganti):
+1. Pasang Node.js dan ekstrak SoanKofe-Server di komputer baru.
+2. Ekstrak file cadangan .zip ke dalam folder SoanKofe-Server (folder "data" ikut terbentuk).
+   Atau: salin data-terbaru.json dari Google Drive ke SoanKofe-Server/data/ lalu ganti namanya
+   menjadi store.json, dan salin isi folder berkas ke SoanKofe-Server/data/files/.
+3. Nyalakan server. Semua perangkat tersambung lagi dengan kode toko yang sama.
 - Kalau server mati sebentar, tablet tetap bisa berjualan. Header menampilkan "Offline",
   dan transaksi otomatis terkirim begitu server menyala lagi.
 
