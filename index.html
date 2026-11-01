@@ -93,7 +93,7 @@ body.dev-on{padding-right:400px}body.dev-on .pos.pop .cart{right:416px}
 .dv-adds{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
 .dv-sw{display:flex;gap:10px;align-items:flex-start;cursor:pointer;padding:4px 0}.dv-sw input{width:18px;height:18px;margin-top:2px;accent-color:var(--amber)}.dv-sw b{display:block;font-size:13px;font-weight:600}.dv-sw small{display:block;font-size:11.5px;color:var(--muted)}
 .dv-li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:center}.dv-li input[type=checkbox]{width:18px;height:18px;accent-color:var(--amber)}.dv-li .in{min-height:34px;padding:6px 9px;font-size:13px}
-.dv-seg{width:100%}.dv-pg{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px dashed var(--line)}.dv-pn{font-size:13px;font-weight:600;min-width:0}.dv-pn small{color:var(--muted);font-weight:400}.dv-li3{grid-template-columns:auto minmax(0,1fr) auto}.dv-reset{padding:14px 2px 0}
+.dv-seg{width:100%}.imp-sum{font-size:13px;margin:4px 0 8px}.imp-g{margin-top:8px}.imp-r{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line)}.imp-r.ada{opacity:.5}.imp-n{min-width:0}.imp-n b{display:block;font-size:13.5px}.imp-n small{color:var(--muted);font-size:11.5px}#imp-prev{max-height:46vh;overflow:auto}.dv-pg{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px dashed var(--line)}.dv-pn{font-size:13px;font-weight:600;min-width:0}.dv-pn small{color:var(--muted);font-weight:400}.dv-li3{grid-template-columns:auto minmax(0,1fr) auto}.dv-reset{padding:14px 2px 0}
 .dv-foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}.dv-foot .btn:disabled{opacity:.45}
 @media (max-width:999px){body.dev-on{padding-right:0}#devbar{width:auto;left:0;top:auto;height:62dvh;border-left:0;border-top:1px solid var(--line);border-radius:18px 18px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.2)}body.dev-on .content{padding-bottom:calc(62dvh + 16px)}}
 .ak-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}.ak-grid .chk{font-weight:500}@media (max-width:420px){.ak-grid{grid-template-columns:1fr}}
@@ -469,7 +469,9 @@ const chip=(act,v,label,cur)=>'<button class="chip'+(v===cur?' on':'')+'" data-a
 const hasRecipe=p=>Array.isArray(p.recipe)&&p.recipe.length>0;
 const modeOf=p=>p.mode==='recipe'&&hasRecipe(p)?'recipe':(p.mode==='stock'||(!p.mode&&p.track))?'stock':'none';
 const recipeCost=(rec,list)=>Math.round(rec.reduce((a,r)=>{const g=list.find(x=>x.id===r.iid);return a+(g?g.cost*r.qty:0)},0));
-const UNITS=['gr','ml','pcs'];
+const UNITS=['gr','g','kg','ml','L','pcs','botol','kotak','kaleng','box','pack','roll','lembar','cup','bag','galon'];
+const JENIS={produk:'Bahan & kemasan produk jual',lain:'Perlengkapan & operasional'};
+const ingJenis=g=>g&&g.jenis==='lain'?'lain':'produk';
 const SEED_ING=[
  ['i-espresso','Biji Espresso Blend','g',4200,1000,150,'Soan Roastery'],
 ];
@@ -1298,7 +1300,7 @@ const DAY_ID=['Minggu','Senin','Selasa','Rabu','Kamis','Jumat','Sabtu'];
 const waTgl=ts=>{const d=new Date(ts);return DAY_ID[d.getDay()]+', '+d.getDate()+' '+MON_EN[d.getMonth()]+' '+d.getFullYear()};
 function waStockGroups(){
   const g={Habis:[],Menipis:[],Aman:[]};
-  db.ingredients.filter(x=>x.active!==false).forEach(x=>{const st=ingState(x);g[st==='bad'?'Habis':st==='warn'?'Menipis':'Aman'].push({name:x.name,qty:Math.max(0,x.stock),unit:x.unit})});
+  db.ingredients.filter(x=>x.active!==false&&!x.belumCek).forEach(x=>{const st=ingState(x);g[st==='bad'?'Habis':st==='warn'?'Menipis':'Aman'].push({name:x.name,qty:Math.max(0,x.stock),unit:x.unit})});
   db.products.filter(p=>p.active&&modeOf(p)==='stock').forEach(p=>{const mn=p.min||0;g[p.stock<=0?'Habis':p.stock<=mn?'Menipis':'Aman'].push({name:p.name,qty:Math.max(0,p.stock),unit:'pcs'})});
   Object.values(g).forEach(a=>a.sort((x,y)=>x.name.localeCompare(y.name)));return g;
 }
@@ -1788,6 +1790,7 @@ const ingState=g=>g.stock<=0?'bad':g.stock<=g.min?'warn':'ok';
 function unitCost(p){return modeOf(p)==='recipe'?recipeCost(p.recipe,db.ingredients):(p.cost||0)}
 function menuMargin(p){return p.price?Math.round((p.price-unitCost(p))/p.price*100):0}
 function logIng(iid,type,qty,note,unitCostV){
+  {const g=ingById(iid);if(g&&g.belumCek)delete g.belumCek}
   db.ingLog.push({id:uid(),ts:Date.now(),iid,type,qty,note:note||'',unitCost:unitCostV==null?null:unitCostV,userId:S.user?S.user.id:null});
   if(db.ingLog.length>2500)db.ingLog.splice(0,db.ingLog.length-2000);
 }
@@ -1934,7 +1937,7 @@ function stockSave(id){
 }
 
 /* ========== bahan baku: daftar & form ========== */
-function ingRows(){const q=S.iq.trim().toLowerCase();return db.ingredients.filter(g=>!q||g.name.toLowerCase().includes(q)||(g.supplier||'').toLowerCase().includes(q))}
+function ingRows(){const q=S.iq.trim().toLowerCase(),J=S.ij||'all';return db.ingredients.filter(g=>(J==='all'||ingJenis(g)===J)).filter(g=>!q||g.name.toLowerCase().includes(q)||(g.supplier||'').toLowerCase().includes(q))}
 function ingListHTML(){
   if(!db.ingredients.length)return empty('Belum ada bahan baku','Tambahkan biji kopi, susu, gula, dan kemasan yang Anda pakai.');
   const list=ingRows();
@@ -1942,7 +1945,7 @@ function ingListHTML(){
   const used=usedInMap(),rate=dailyUse();
   const rows=list.map(g=>{
     const s=ingState(g),pct=Math.min(100,Math.round(g.stock/Math.max(g.min*4,g.stock,1)*100)),u=used[g.id]||[];
-    return '<tr data-act="ing-edit" data-id="'+g.id+'"><td><b>'+esc(g.name)+'</b><div class="sub">'+esc(g.supplier||'Tanpa supplier')+'</div></td><td class="r"><b>'+fq(g.stock)+'</b> <span class="muted">'+g.unit+'</span><div class="cover">sisa '+coverTxt(g,rate)+'</div></td><td class="r">'+fq(g.min)+'</td><td style="min-width:100px"><div class="pbar"><i class="'+(s==='ok'?'':s)+'" style="width:'+Math.max(pct,s==='bad'?0:4)+'%"></i></div></td><td class="r">'+rpd(g.cost)+'<div class="sub">per '+g.unit+'</div></td><td>'+(u.length?'<span title="'+esc(u.join(', '))+'">'+u.length+' menu</span>':'<span class="muted">Belum dipakai</span>')+'</td><td>'+(g.active?'<span class="pill '+s+'">'+(s==='bad'?'Habis':s==='warn'?'Menipis':'Aman')+'</span>':'<span class="pill">Nonaktif</span>')+'</td><td class="r"><button class="btn sm ghost" data-act="ing-restock" data-id="'+g.id+'">Restock</button></td></tr>';
+    return '<tr data-act="ing-edit" data-id="'+g.id+'"><td><b>'+esc(g.name)+'</b><div class="sub">'+(ingJenis(g)==='lain'?'<span class="pill">Lainnya</span> ':'<span class="pill ok">Produk jual</span> ')+(g.belumCek?'<span class="pill warn">Belum dicek</span> ':'')+esc(g.supplier||'Tanpa supplier')+'</div></td><td class="r"><b>'+fq(g.stock)+'</b> <span class="muted">'+g.unit+'</span><div class="cover">sisa '+coverTxt(g,rate)+'</div></td><td class="r">'+fq(g.min)+'</td><td style="min-width:100px"><div class="pbar"><i class="'+(s==='ok'?'':s)+'" style="width:'+Math.max(pct,s==='bad'?0:4)+'%"></i></div></td><td class="r">'+rpd(g.cost)+'<div class="sub">per '+g.unit+'</div></td><td>'+(u.length?'<span title="'+esc(u.join(', '))+'">'+u.length+' menu</span>':'<span class="muted">Belum dipakai</span>')+'</td><td>'+(g.active?'<span class="pill '+s+'">'+(s==='bad'?'Habis':s==='warn'?'Menipis':'Aman')+'</span>':'<span class="pill">Nonaktif</span>')+'</td><td class="r"><button class="btn sm ghost" data-act="ing-restock" data-id="'+g.id+'">Restock</button></td></tr>';
   }).join('');
   return '<div class="tablewrap"><table style="min-width:880px"><thead><tr><th>Bahan</th><th class="r">Stok</th><th class="r">Minimum</th><th>Level</th><th class="r">HPP / satuan</th><th>Dipakai di</th><th>Status</th><th></th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
@@ -1954,16 +1957,17 @@ function updateIngHint(){
 function ingForm(id){
   const g=id?ingById(id):{name:'',unit:'g',stock:'',min:'',cost:'',supplier:'',active:true};
   const used=id?(usedInMap()[id]||[]):[];
-  modal({title:id?'Ubah bahan baku':'Bahan baku baru',body:'<div class="form"><div class="fld"><label class="lbl" for="if-name">Nama bahan</label><input class="in" id="if-name" value="'+esc(g.name)+'" placeholder="Contoh: Susu Full Cream"></div><div class="fld-row"><div class="fld"><label class="lbl" for="if-unit">Satuan</label><select class="sel" id="if-unit" data-ch="ing-unit">'+UNITS.map(u=>'<option'+(g.unit===u?' selected':'')+'>'+u+'</option>').join('')+'</select></div><div class="fld"><label class="lbl" for="if-sup">Supplier</label><input class="in" id="if-sup" value="'+esc(g.supplier||'')+'"></div></div><div class="rc"><div class="lbl">Hitung HPP dari kemasan (opsional)</div><div class="fld-row"><div class="fld"><label class="lbl" for="if-pp">Harga kemasan (Rp)</label><input class="in" id="if-pp" data-in="ing-pack" inputmode="decimal" placeholder="Contoh: 150000"></div><div class="fld"><label class="lbl" for="if-pq">Isi kemasan</label><input class="in" id="if-pq" data-in="ing-pack" inputmode="decimal" placeholder="Contoh: 1000"></div></div></div><div class="fld"><label class="lbl" for="if-cost">HPP per satuan (Rp)</label><input class="in" id="if-cost" data-in="ing-cost" inputmode="decimal" value="'+esc(g.cost)+'"><span class="hint" id="if-hint"></span></div><div class="fld-row"><div class="fld"><label class="lbl" for="if-stock">'+(id?'Stok saat ini':'Stok awal')+'</label><input class="in" id="if-stock" inputmode="decimal" value="'+esc(g.stock)+'"'+(id?' disabled':'')+'></div><div class="fld"><label class="lbl" for="if-min">Batas stok menipis</label><input class="in" id="if-min" inputmode="decimal" value="'+esc(g.min)+'"></div></div>'+(id?'<p class="hint">Ubah jumlah stok lewat Restock atau Sesuaikan agar tercatat di mutasi.</p>':'')+(used.length?'<p class="hint">Dipakai di resep: '+esc(used.join(', '))+'</p>':'')+'<label class="chk"><input type="checkbox" id="if-active"'+(g.active?' checked':'')+'>Aktif</label></div>',foot:(id?'<button class="btn danger" data-act="ing-del" data-id="'+id+'">Hapus</button><button class="btn ghost" data-act="ing-adj" data-id="'+id+'">Sesuaikan stok</button>':'')+'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="ing-save" data-id="'+(id||'')+'">Simpan</button>'});
+  modal({title:id?'Ubah bahan baku':'Bahan baku baru',body:'<div class="form"><div class="fld"><label class="lbl" for="if-name">Nama bahan</label><input class="in" id="if-name" value="'+esc(g.name)+'" placeholder="Contoh: Susu Full Cream"></div><div class="fld"><span class="lbl">Kelompok</span><div class="seg" role="group" aria-label="Kelompok bahan"><button type="button" class="'+(ingJenis(g)==='produk'?'on':'')+'" data-act="if-jenis" data-v="produk">Produk jual</button><button type="button" class="'+(ingJenis(g)==='lain'?'on':'')+'" data-act="if-jenis" data-v="lain">Lainnya / operasional</button></div><input type="hidden" id="if-jenis" value="'+ingJenis(g)+'"></div><div class="fld-row"><div class="fld"><label class="lbl" for="if-unit">Satuan</label><select class="sel" id="if-unit" data-ch="ing-unit">'+(UNITS.includes(g.unit)?UNITS:[g.unit].concat(UNITS)).map(u=>'<option'+(g.unit===u?' selected':'')+'>'+esc(u)+'</option>').join('')+'</select></div><div class="fld"><label class="lbl" for="if-sup">Supplier</label><input class="in" id="if-sup" value="'+esc(g.supplier||'')+'"></div></div><div class="rc"><div class="lbl">Hitung HPP dari kemasan (opsional)</div><div class="fld-row"><div class="fld"><label class="lbl" for="if-pp">Harga kemasan (Rp)</label><input class="in" id="if-pp" data-in="ing-pack" inputmode="decimal" placeholder="Contoh: 150000"></div><div class="fld"><label class="lbl" for="if-pq">Isi kemasan</label><input class="in" id="if-pq" data-in="ing-pack" inputmode="decimal" placeholder="Contoh: 1000"></div></div></div><div class="fld"><label class="lbl" for="if-cost">HPP per satuan (Rp)</label><input class="in" id="if-cost" data-in="ing-cost" inputmode="decimal" value="'+esc(g.cost)+'"><span class="hint" id="if-hint"></span></div><div class="fld-row"><div class="fld"><label class="lbl" for="if-stock">'+(id?'Stok saat ini':'Stok awal')+'</label><input class="in" id="if-stock" inputmode="decimal" value="'+esc(g.stock)+'"'+(id?' disabled':'')+'></div><div class="fld"><label class="lbl" for="if-min">Batas stok menipis</label><input class="in" id="if-min" inputmode="decimal" value="'+esc(g.min)+'"></div></div>'+(id?'<p class="hint">Ubah jumlah stok lewat Restock atau Sesuaikan agar tercatat di mutasi.</p>':'')+(used.length?'<p class="hint">Dipakai di resep: '+esc(used.join(', '))+'</p>':'')+'<label class="chk"><input type="checkbox" id="if-active"'+(g.active?' checked':'')+'>Aktif</label></div>',foot:(id?'<button class="btn danger" data-act="ing-del" data-id="'+id+'">Hapus</button><button class="btn ghost" data-act="ing-adj" data-id="'+id+'">Sesuaikan stok</button>':'')+'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="ing-save" data-id="'+(id||'')+'">Simpan</button>'});
   updateIngHint();
 }
+ACT['if-jenis']=el=>{$('#if-jenis').value=el.dataset.v;$$('[data-act="if-jenis"]').forEach(b=>b.classList.toggle('on',b===el))};
 function ingSave(id){
   const name=$('#if-name').value.trim();
   if(!name){toast('Nama bahan wajib diisi');return}
   if(db.ingredients.some(g=>g.id!==id&&g.name.toLowerCase()===name.toLowerCase())){toast('Nama bahan sudah ada');return}
   const cost=dec($('#if-cost').value);
-  if(cost<=0){toast('Isi HPP per satuan lebih dari 0');return}
-  const o={name,unit:$('#if-unit').value,supplier:$('#if-sup').value.trim(),cost,min:Math.max(0,dec($('#if-min').value)),active:$('#if-active').checked};
+  if(cost<0||($('#if-cost').value.trim()!==''&&isNaN(cost))){toast('HPP per satuan tidak valid');return}
+  const o={name,jenis:$('#if-jenis').value==='lain'?'lain':'produk',unit:$('#if-unit').value,supplier:$('#if-sup').value.trim(),cost,min:Math.max(0,dec($('#if-min').value)),active:$('#if-active').checked};
   if(id)Object.assign(ingById(id),o);
   else{const stock=Math.max(0,dec($('#if-stock').value)),g=Object.assign({id:'i-'+uid(),stock},o);db.ingredients.push(g);if(stock)logIng(g.id,'restock',stock,'Stok awal',cost)}
   save();closeModal();render();toast('Bahan baku disimpan');
@@ -1998,10 +2002,96 @@ function ingAdjSave(id){
   save();closeModal();render();toast('Stok bahan diperbarui');
 }
 
+/* ---- impor daftar bahan (tempel teks: "1. Nama : 700 Gr *HABIS*") ---- */
+const SOAN_BAHAN=`1. Beans Base Kopi Susu : gr *HABIS*
+2. Beans Espresso : 700 Gr
+3. Beans Manual Brew : 190 Gr
+4. Kombucha 1L : 0 Botol
+5. Kombucha 500 ml : 0 Botol
+6. Fresh Milk (946 ml) : 4 Kotak
+7. Susu Kental Manis : 30 Klg
+8. Creamer (500 gr) : 17 Box
+9. Tea : 595 gr
+10. Syrup Lychee (1000 ml) : 1 Btl *HAMPIR HABIS*
+11. Yakult : 0 Botol
+12. Chocolate Powder : 720 gr
+13. Avocado Powder : 0 gr
+14. Taro Powder :  gr *HABIS*
+15. Matcha Powder : gr *HABIS*
+16. Red Velvet Powder : 270 gr
+17. AQUA Botol (330 ml) : 39 botol
+18. Amidis Galon (19 liter) : 1 galon
+19. Ice Cube : 1 bag
+20. Cup Ice : 150 Cup
+21. Cup Hot : 151 Cup
+22. Tutup Cup Hot : 151 pcs
+23. Botol 1 liter : 30 botol
+24. Botol 500 ml : 59 botol
+25. Botol 250 ml : 74 botol
+26. Sedotan Ice : 800+
+27. Sedotan Hot : 3 Pack
+28. V60 Paper Filter 01 : 38 Lbr
+29. V60 Paper Filter 02 : 11 Lbr
+30. SOAN Sticker : 50
+31. Plastik Sealer : 1 roll
+32. Plastik Take Away Kecil : 2 pack
+33. Plastik Take Away Besar : 5 pack
+34. Plastik Sampah : 5 pack
+35. Cable Ties : 2 pack
+36. Tissue : 2 Pack
+37. Tissue Kitchen : 3 roll
+38. Tissue Toilet : Roll *HABIS*
+39. Sabun Cuci Gelas : 500 ml
+40. Sabun Cuci Tangan  : 1 Btl
+41. Cairan Pembersih Kaca : 1.400 ml
+42. Paper Print : 26 Pcs
+43. Green Beans : 0 Gr`;
+const UNIT_MAP={gr:'gr',g:'gr',gram:'gr',kg:'kg',ml:'ml',l:'L',liter:'L',ltr:'L',botol:'botol',btl:'botol',kotak:'kotak',klg:'kaleng',kaleng:'kaleng',box:'box',pack:'pack',pak:'pack',roll:'roll',lbr:'lembar',lembar:'lembar',cup:'cup',pcs:'pcs',bag:'bag',galon:'galon',buah:'pcs',bks:'pack'};
+const LAIN_RX=/tissue|tisu|sabun|pembersih|plastik sampah|plastik take ?away|cable ?ties|paper print|kertas struk|green beans|lap\b|sapu|pel\b|kantong sampah/i;
+function parseBahan(t){
+  const out=[];String(t||'').split(/\r?\n/).forEach(l=>{
+    l=l.trim();if(!l)return;const m=l.match(/^(?:\d+\s*[.)\-]\s*)?(.+?)\s*[:=]\s*(.*)$/);if(!m)return;
+    let name=m[1].replace(/\s+/g,' ').trim(),rest=m[2].replace(/\*[^*]*\*/g,' ').trim();if(!name)return;
+    const q=rest.match(/^([\d.,]+)\s*\+?/);let qty=null;if(q){const raw=q[1];qty=/^\d{1,3}(\.\d{3})+$/.test(raw)?+raw.replace(/\./g,''):+raw.replace(/\./g,'').replace(',','.');rest=rest.slice(q[0].length).trim()}
+    const u=(rest.split(/\s+/)[0]||'').toLowerCase().replace(/[^a-z]/g,''),unit=UNIT_MAP[u]||(u?u.slice(0,10):'pcs');
+    out.push({name:name.slice(0,60),qty,unit,jenis:LAIN_RX.test(name)?'lain':'produk',ada:db.ingredients.find(g=>g.name.toLowerCase()===name.toLowerCase())||null});
+  });return out;
+}
+function impRowsHTML(){
+  const R=S.imp.rows;if(!R.length)return '<p class="muted" style="margin:0">Tempel daftar di atas, satu bahan per baris. Contoh: <b>2. Beans Espresso : 700 Gr</b></p>';
+  const grp=k=>R.map((r,i)=>[r,i]).filter(([r])=>r.jenis===k);
+  const row=([r,i])=>'<div class="imp-r'+(r.ada?' ada':'')+'"><span class="imp-n"><b>'+esc(r.name)+'</b><small>'+esc(r.unit)+(r.qty!=null?' · daftar: '+fq(r.qty):'')+(r.ada?' · sudah ada, dilewati':'')+'</small></span><button class="btn sm ghost" data-act="imp-move" data-i="'+i+'">'+(r.jenis==='produk'?'→ Lainnya':'→ Produk jual')+'</button></div>';
+  const baru=R.filter(r=>!r.ada).length;
+  return '<div class="imp-sum">'+R.length+' baris terbaca · <b>'+baru+' bahan baru</b>'+(R.length-baru?' · '+(R.length-baru)+' sudah ada':'')+'</div>'
+   +['produk','lain'].map(k=>'<div class="imp-g"><div class="lbl">'+JENIS[k]+' ('+grp(k).length+')</div>'+(grp(k).map(row).join('')||'<p class="muted" style="margin:4px 0">-</p>')+'</div>').join('');
+}
+function impOpen(){
+  S.imp={rows:[],stok:false};
+  modal({title:'Impor daftar bahan',wide:true,body:'<div class="form"><div class="fld"><label class="lbl" for="imp-txt">Daftar bahan</label><textarea class="ta" id="imp-txt" data-in="imp-txt" rows="7" placeholder="1. Beans Espresso : 700 Gr&#10;2. Fresh Milk (946 ml) : 4 Kotak&#10;3. Tissue : 2 Pack"></textarea><button class="btn sm ghost" data-act="imp-soan" style="align-self:flex-start;margin-top:6px">Pakai daftar bahan Soan Kofe (43)</button></div>'
+   +'<label class="chk"><input type="checkbox" id="imp-stok" data-ch="imp-stok">Ikut isi jumlah stok dari daftar</label><p class="muted" style="font-size:12px;margin:-6px 0 0">Tidak dicentang: hanya nama & satuan yang masuk. Stok diisi lewat Inventory → Cek & sesuaikan stok, dan bahan ditandai <b>Belum dicek</b> sampai dihitung.</p>'
+   +'<div id="imp-prev">'+impRowsHTML()+'</div></div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="imp-go">Simpan ke bahan baku</button>'});
+}
+const impRender=()=>{const b=$('#imp-prev');if(b)b.innerHTML=impRowsHTML()};
+ACT['ing-import']=()=>impOpen();
+ACT['imp-soan']=()=>{const t=$('#imp-txt');t.value=SOAN_BAHAN;S.imp.rows=parseBahan(t.value);impRender()};
+INP['imp-txt']=el=>{const old={};S.imp.rows.forEach(r=>old[r.name.toLowerCase()]=r.jenis);S.imp.rows=parseBahan(el.value).map(r=>Object.assign(r,old[r.name.toLowerCase()]?{jenis:old[r.name.toLowerCase()]}:{}));impRender()};
+CH['imp-stok']=el=>{S.imp.stok=el.checked};
+ACT['imp-move']=el=>{const r=S.imp.rows[+el.dataset.i];if(r){r.jenis=r.jenis==='produk'?'lain':'produk';impRender()}};
+ACT['imp-go']=()=>{
+  const R=S.imp.rows.filter(r=>!r.ada);if(!R.length){toast(S.imp.rows.length?'Semua bahan sudah ada':'Tempel daftar bahan dulu');return}
+  const stok=S.imp.stok,seen=new Set();let n=0;
+  R.forEach(r=>{const key=r.name.toLowerCase();if(seen.has(key))return;seen.add(key);
+    const g={id:'i-'+uid(),name:r.name,jenis:r.jenis,unit:r.unit,supplier:'',cost:0,min:0,stock:0,active:true};
+    if(stok&&r.qty>0)g.stock=r.qty;else if(!stok)g.belumCek=true;
+    db.ingredients.push(g);if(stok&&r.qty>0)logIng(g.id,'restock',r.qty,'Stok awal (impor daftar)',0);n++});
+  save();closeModal();S.ij='all';render();toast(n+' bahan ditambahkan'+(stok?'':'. Isi stoknya lewat Inventory → Cek stok'));
+};
+ACT.ij=el=>{S.ij=el.dataset.v;render()};
+
 /* ========== dashboard Menu & Bahan ========== */
 function menuSumHTML(){
   const acts=db.products.filter(p=>p.active),rec=acts.filter(p=>modeOf(p)==='recipe'),noLink=acts.filter(p=>modeOf(p)==='none');
-  const ings=db.ingredients.filter(g=>g.active),low=ings.filter(g=>g.stock<=g.min).sort((a,b)=>a.stock/Math.max(a.min,1)-b.stock/Math.max(b.min,1));
+  const ings=db.ingredients.filter(g=>g.active),low=ings.filter(g=>!g.belumCek&&g.stock<=g.min).sort((a,b)=>a.stock/Math.max(a.min,1)-b.stock/Math.max(b.min,1));
   const val=db.ingredients.reduce((a,g)=>a+Math.max(0,g.stock)*g.cost,0);
   const avgM=acts.length?Math.round(acts.reduce((a,p)=>a+menuMargin(p),0)/acts.length):0;
   const rate=dailyUse();
@@ -2026,7 +2116,8 @@ function menuTabHTML(){
   return '<div class="toolbar"><div class="toolbar-r"><input class="in search" data-in="pq" placeholder="Cari menu atau SKU" value="'+esc(S.pq)+'" aria-label="Cari menu"><select class="sel" data-ch="pc" aria-label="Kategori"><option value="all">Semua kategori</option>'+db.categories.map(c=>'<option value="'+c.id+'"'+(S.pc===c.id?' selected':'')+'>'+esc(c.name)+'</option>').join('')+'</select></div><div class="toolbar-r"><button class="btn ghost" data-act="cat-manage">Kategori</button><button class="btn primary" data-act="prod-new">'+ico('plus')+'Menu baru</button></div></div><div class="card flush" id="plist">'+productListHTML()+'</div>';
 }
 function ingTabHTML(){
-  return '<div class="toolbar"><input class="in search" data-in="iq" placeholder="Cari bahan atau supplier" value="'+esc(S.iq)+'" aria-label="Cari bahan" style="width:260px;max-width:100%"><button class="btn primary" data-act="ing-new">'+ico('plus')+'Bahan baru</button></div><div class="card flush" id="ilist">'+ingListHTML()+'</div>';
+  const J=S.ij||'all',n=k=>db.ingredients.filter(g=>ingJenis(g)===k).length;
+  return '<div class="toolbar"><div class="chips">'+chip('ij','all','Semua ('+db.ingredients.length+')',J)+chip('ij','produk','Produk jual ('+n('produk')+')',J)+chip('ij','lain','Lainnya ('+n('lain')+')',J)+'</div><div class="toolbar-r"><input class="in search" data-in="iq" placeholder="Cari bahan atau supplier" value="'+esc(S.iq)+'" aria-label="Cari bahan" style="width:230px;max-width:100%"><button class="btn ghost" data-act="ing-import">Impor daftar</button><button class="btn primary" data-act="ing-new">'+ico('plus')+'Bahan baru</button></div></div><div class="card flush" id="ilist">'+ingListHTML()+'</div>';
 }
 function logTabHTML(){
   const rows=[];
@@ -2043,7 +2134,7 @@ function invAgo(ts){if(!ts)return 'belum pernah dicek';const m=Math.round((Date.
 function invItems(){
   const I=S.inv,q=I.q.trim().toLowerCase(),t0=sod(Date.now());
   const ok=x=>(!q||x.name.toLowerCase().includes(q))&&(I.f==='all'||(I.f==='bad'&&x.st==='bad')||(I.f==='warn'&&x.st==='warn')||(I.f==='todo'&&!(x.checkTs>=t0)));
-  const ings=db.ingredients.filter(g=>g.active!==false).map(g=>({k:'i:'+g.id,name:g.name,sub:g.supplier||'',unit:g.unit,stock:g.stock,min:g.min,st:ingState(g),checkTs:g.checkTs,checkBy:g.checkBy,dec:true,ref:g}));
+  const ings=db.ingredients.filter(g=>g.active!==false).map(g=>({k:'i:'+g.id,jenis:ingJenis(g),baru:!!g.belumCek,name:g.name,sub:g.supplier||'',unit:g.unit,stock:g.stock,min:g.min,st:ingState(g),checkTs:g.checkTs,checkBy:g.checkBy,dec:true,ref:g}));
   const prods=db.products.filter(p=>p.active&&modeOf(p)==='stock').map(p=>({k:'p:'+p.id,name:p.name,sub:'Produk jadi',unit:'pcs',stock:p.stock,min:p.min||0,st:p.stock<=0?'bad':p.stock<=(p.min||0)?'warn':'ok',checkTs:p.checkTs,checkBy:p.checkBy,dec:false,ref:p}));
   return {ings,prods,show:{ings:ings.filter(ok).sort((a,b)=>a.name.localeCompare(b.name)),prods:prods.filter(ok).sort((a,b)=>a.name.localeCompare(b.name))}};
 }
@@ -2051,14 +2142,14 @@ function invDiff(x){const v=S.inv.cnt[x.k];if(v==null||String(v).trim()==='')ret
 function invDiffHTML(x){const d=invDiff(x);if(d==null)return '<span class="muted">—</span>';if(Math.abs(d)<1e-9)return '<span class="inv-d" style="color:var(--muted)">Cocok</span>';return '<span class="inv-d '+(d>0?'up':'dn')+'">'+(d>0?'+':'−')+fq(Math.abs(d))+' '+esc(x.unit)+'</span>'}
 function invRow(x){
   const u=userById(x.checkBy),stl={ok:['Aman','ok'],warn:['Menipis','warn'],bad:['Habis','bad']}[x.st],isI=x.k[0]==='i';
-  return '<tr><td><b>'+esc(x.name)+'</b><div class="sub">'+(x.sub?esc(x.sub)+' · ':'')+invAgo(x.checkTs)+(u&&x.checkTs?' oleh '+esc(u.name):'')+'</div></td><td class="r"><b>'+fq(x.stock)+'</b> <span class="muted">'+esc(x.unit)+'</span></td><td class="r">'+fq(x.min)+'</td><td><span class="pill '+stl[1]+'">'+stl[0]+'</span></td>'
+  return '<tr><td><b>'+esc(x.name)+'</b><div class="sub">'+(x.sub?esc(x.sub)+' · ':'')+invAgo(x.checkTs)+(u&&x.checkTs?' oleh '+esc(u.name):'')+'</div></td><td class="r"><b>'+fq(x.stock)+'</b> <span class="muted">'+esc(x.unit)+'</span></td><td class="r">'+fq(x.min)+'</td><td>'+(x.baru?'<span class="pill warn">Belum dicek</span>':'<span class="pill '+stl[1]+'">'+stl[0]+'</span>')+'</td>'
    +'<td class="r"><input class="in inv-cnt" data-in="inv-cnt" data-k="'+x.k+'" inputmode="decimal" placeholder="'+fq(x.stock)+'" value="'+esc(S.inv.cnt[x.k]||'')+'" aria-label="Hasil hitung '+esc(x.name)+'"></td><td class="r" id="invd-'+x.k.replace(':','-')+'">'+invDiffHTML(x)+'</td>'
    +'<td class="r" style="white-space:nowrap">'+(isI?'<button class="btn sm ghost" data-act="ing-restock" data-id="'+x.ref.id+'">Terima</button> <button class="btn sm ghost" data-act="ing-adj" data-id="'+x.ref.id+'">Rusak</button>':'<button class="btn sm ghost" data-act="stock-adj" data-id="'+x.ref.id+'">Sesuaikan</button>')+'</td></tr>';
 }
 function invFootTxt(){const it=invItems(),all=it.ings.concat(it.prods);let n=0,c=0;all.forEach(x=>{const d=invDiff(x);if(d==null)return;n++;if(Math.abs(d)>1e-9)c++});return {n,c,t:n?n+' item dihitung · '+c+' berbeda dari catatan':'Isi kolom "Hitung fisik" sesuai jumlah di gudang/bar'}}
 VIEWS.inventory=function(){
   const I=S.inv||(S.inv={tab:partIds('inventory').find(x=>x==='cek'||x==='log')||'cek',f:'all',q:'',cnt:{}}),it=invItems(),all=it.ings.concat(it.prods),t0=sod(Date.now());
-  const n=st=>all.filter(x=>x.st===st).length,todo=all.filter(x=>!(x.checkTs>=t0)).length,last=Math.max(0,...all.map(x=>x.checkTs||0));
+  const n=st=>all.filter(x=>x.st===st&&!x.baru).length,todo=all.filter(x=>!(x.checkTs>=t0)).length,last=Math.max(0,...all.map(x=>x.checkTs||0));
   const kp='<div class="kpis"><div class="kpi"><span class="lbl">Item dipantau</span><span class="v">'+all.length+'</span><span class="muted" style="font-size:12px">'+it.ings.length+' bahan · '+it.prods.length+' produk</span></div><div class="kpi"><span class="lbl">Habis</span><span class="v" style="color:var(--bad)">'+n('bad')+'</span></div><div class="kpi"><span class="lbl">Menipis</span><span class="v" style="color:var(--warn,#b7791f)">'+n('warn')+'</span></div><div class="kpi'+(todo?' hero':'')+'"><span class="lbl">Belum dicek hari ini</span><span class="v">'+todo+'</span><span class="muted" style="font-size:12px">'+(last?'Terakhir '+fmtDT(last):'Belum ada pengecekan')+'</span></div></div>';
   const itabs=partIds('inventory').filter(x=>x==='cek'||x==='log');if(!itabs.includes(I.tab))I.tab=itabs[0]||'cek';
   const tabs='<div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:space-between;margin:4px 0 2px"><div class="chips">'+itabs.map(t=>chip('inv-tab',t,partLabel('inventory',t,t==='cek'?'Cek & sesuaikan stok':'Riwayat mutasi'),I.tab)).join('')+'</div>'+(fiturOn('wa')?'<button class="btn sm ghost" data-act="wa-send" data-ev="stok">Kirim status stok ke grup</button>':'')+'</div>';
@@ -2067,7 +2158,7 @@ VIEWS.inventory=function(){
   const fl=[['all','Semua'],['bad','Habis'],['warn','Menipis'],['todo','Belum dicek hari ini']];
   const head='<thead><tr><th>Item</th><th class="r">Tercatat</th><th class="r">Min</th><th>Status</th><th class="r">Hitung fisik</th><th class="r">Selisih</th><th></th></tr></thead>';
   const tbl=(title,rows)=>rows.length?'<div class="card flush" style="margin-top:12px"><div class="card-h" style="padding:14px 18px 0"><h3>'+title+'</h3><span class="muted">'+rows.length+' item</span></div><div class="tablewrap"><table class="inv-tbl" style="min-width:820px">'+head+'<tbody>'+rows.map(invRow).join('')+'</tbody></table></div></div>':'';
-  const body=tbl('Bahan baku',it.show.ings)+tbl('Produk stok (barang jadi)',it.show.prods);
+  const body=tbl(JENIS.produk,it.show.ings.filter(x=>x.jenis==='produk'))+tbl('Produk stok (barang jadi)',it.show.prods)+tbl(JENIS.lain,it.show.ings.filter(x=>x.jenis==='lain'));
   const ft=invFootTxt();
   return KP+tabs+'<div class="toolbar"><div class="chips">'+fl.map(f=>chip('inv-f',f[0],f[1],I.f)).join('')+'</div><input class="in search" data-in="inv-q" id="inv-q" placeholder="Cari bahan / produk" value="'+esc(I.q)+'" aria-label="Cari item" style="width:220px;max-width:100%"></div>'
    +(body||'<div class="card">'+empty('Tidak ada item','Ubah filter atau kata kunci pencarian.')+'</div>')
@@ -2084,7 +2175,7 @@ ACT['inv-save']=()=>{
   const it=invItems(),all=it.ings.concat(it.prods),note=($('#inv-note')||{}).value||'',now=Date.now(),me=S.user?S.user.id:null;let n=0,c=0;
   all.forEach(x=>{const d=invDiff(x);if(d==null)return;n++;const r=x.ref;
     if(Math.abs(d)>1e-9){c++;if(x.k[0]==='i'){r.stock=Math.round((r.stock+d)*1000)/1000;logIng(r.id,'opname',d,'Cek stok'+(note.trim()?': '+note.trim():''))}else{r.stock+=d;logStock(r.id,'opname',d,'Cek stok'+(note.trim()?': '+note.trim():''))}}
-    r.checkTs=now;r.checkBy=me});
+    r.checkTs=now;r.checkBy=me;if(r.belumCek)delete r.belumCek});
   if(!n){toast('Belum ada hasil hitung yang diisi');return}
   S.inv.cnt={};save();render();setTimeout(waTick,1200);toast(n+' item dicek'+(c?', '+c+' disesuaikan':', semua cocok'));
 };
@@ -2130,7 +2221,7 @@ ACT['ing-restock-save']=el=>ingRestockSave(el.dataset.id);
 ACT['ing-adj']=el=>{closeModal();ingAdj(el.dataset.id)};
 ACT['ing-adj-save']=el=>ingAdjSave(el.dataset.id);
 ACT['shop-list']=()=>{
-  const rows=db.ingredients.filter(g=>g.active&&g.stock<=g.min).map(g=>'- '+g.name+': '+fq(Math.max(0,Math.ceil(g.min*3-g.stock)))+' '+g.unit+' (stok '+fq(g.stock)+')');
+  const rows=db.ingredients.filter(g=>g.active&&!g.belumCek&&g.stock<=g.min).map(g=>'- '+g.name+': '+fq(Math.max(0,Math.ceil(g.min*3-g.stock)))+' '+g.unit+' (stok '+fq(g.stock)+')');
   copyText('Daftar belanja '+db.settings.storeName+' · '+fmtDate(Date.now())+'\n'+rows.join('\n'));
 };
 
