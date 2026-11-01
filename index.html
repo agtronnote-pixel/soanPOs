@@ -493,6 +493,7 @@ function save(){
   }catch(e){}
   if(lsSet(LS_KEY,JSON.stringify(db))){lastSaved=Date.now();storageOK=true}
   else if(!saveWarned){saveWarned=true;toast('Data tidak bisa disimpan di browser ini. Salin cadangan sekarang.')}
+  syncSchedule();
 }
 function probeStorage(){
   try{localStorage.setItem('__p','1');localStorage.removeItem('__p');storageOK=true}catch(e){storageOK=false}
@@ -582,7 +583,7 @@ function shellHTML(inner){
   const dark=(document.documentElement.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'))==='dark';
   return '<div class="app"><aside class="side"><div class="brand">'+mark('mark-sm')+wordmark+'</div><nav class="nav">'+side+'</nav><div class="side-foot"><div class="shift-card">'+shiftTxt+'</div><div class="user-chip"><span class="avatar">'+esc(u.name.charAt(0))+'</span><div class="who"><b>'+esc(u.name)+'</b><span>'+(u.role==='owner'?'Pemilik':'Kasir')+'</span></div><button class="icon-btn" data-act="logout" aria-label="Keluar">'+ico('logout')+'</button></div></div></aside>'
    +'<div class="main-wrap"><header class="top">'+mark('mark-sm only-m')+'<div class="ttl"><h1>'+esc(cur?cur.label:'')+'</h1><div class="sub">'+esc(new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}))+'</div></div>'
-   +(db.demo?'<span class="pill amber">Data contoh</span>':'')
+   +(db.demo?'<span class="pill amber">Data contoh</span>':'')+syncPill()
    +printerBtn()+'<button class="icon-btn" data-act="theme" aria-label="Ganti tema">'+ico(dark?'sun':'moon')+'</button><button class="icon-btn only-m" data-act="logout" aria-label="Keluar">'+ico('logout')+'</button></header><main class="content" id="main">'+inner+'</main></div><nav class="tabbar" aria-label="Menu utama">'+tab+'</nav></div>';
 }
 
@@ -919,7 +920,7 @@ VIEWS.settings=function(){
   return '<div class="set-grid"><div class="card"><div class="card-h"><h3>Profil toko</h3></div><div class="form">'+fld('st-name','Nama toko',s.storeName)+fld('st-tag','Tagline',s.tagline)+fld('st-addr','Alamat',s.address)+fld('st-phone','Telepon',s.phone)+fld('st-foot','Pesan di bawah struk',s.footer)+fld('st-prefix','Awalan nomor struk',s.prefix,'maxlength="4"')+'<button class="btn primary" data-act="save-settings">Simpan profil</button></div></div>'
    +'<div class="card"><div class="card-h"><h3>Pajak, layanan, poin, dan stok</h3></div><div class="form"><label class="chk"><input type="checkbox" id="st-tax-on"'+(s.taxEnabled?' checked':'')+'>Kenakan PPN</label>'+fld('st-tax','Tarif PPN (%)',s.taxRate,'inputmode="numeric"')+'<label class="chk"><input type="checkbox" id="st-svc-on"'+(s.serviceEnabled?' checked':'')+'>Kenakan biaya layanan</label>'+fld('st-svc','Biaya layanan (%)',s.serviceRate,'inputmode="numeric"')+fld('st-points','Belanja per 1 poin (Rp)',s.pointsPer,'inputmode="numeric"')+'<label class="chk"><input type="checkbox" id="st-block"'+(s.blockOut?' checked':'')+'>Blokir penjualan jika bahan atau stok tidak cukup</label>'+'<button class="btn primary" data-act="save-tax">Simpan pajak</button></div></div>'
    +'<div class="card"><div class="card-h"><h3>Pengguna</h3><button class="btn sm ghost" data-act="user-new">'+ico('plus')+'Tambah</button></div>'+users+'</div>'
-   +printerCardHTML()+'<div class="card"><div class="card-h"><h3>Data</h3></div><div class="form">'+storageStatusHTML()+'<button class="btn ghost" data-act="backup">Cadangkan data</button>'+snapBtn()+'<button class="btn ghost" data-act="restore">Pulihkan dari cadangan</button><button class="btn danger" data-act="clear-demo">Hapus transaksi &amp; pelanggan contoh</button><button class="btn danger" data-act="reset-demo">Reset ke data contoh</button></div></div></div>';
+   +syncCardHTML()+printerCardHTML()+'<div class="card"><div class="card-h"><h3>Data</h3></div><div class="form">'+storageStatusHTML()+'<button class="btn ghost" data-act="backup">Cadangkan data</button>'+snapBtn()+'<button class="btn ghost" data-act="restore">Pulihkan dari cadangan</button><button class="btn danger" data-act="clear-demo">Hapus transaksi &amp; pelanggan contoh</button><button class="btn danger" data-act="reset-demo">Reset ke data contoh</button></div></div></div>';
 };
 function userForm(id){
   const u=id?userById(id):{name:'',role:'cashier',pin:''};
@@ -1626,13 +1627,185 @@ document.addEventListener('keydown',e=>{
   if(e.key==='Enter'&&e.target.id==='pq'){const l=posProducts();if(l.length===1){ACT.add({dataset:{id:l[0].id}});S.pos.q='';e.target.value='';updatePOS()}}
 });
 
+/* ========== sinkron real-time (Firebase Firestore) ==========
+   Setiap data (transaksi, shift, produk, bahan, pelanggan, pengguna, dst.) disimpan sebagai
+   satu dokumen di stores/{kode toko}/items. Perangkat hanya mengirim data yang berubah dan
+   hanya mengunduh perubahan sejak sinkron terakhir, jadi hemat kuota dan tetap jalan offline. */
+const FB_CFG={apiKey:"AIzaSyDbXVUfvA68U_hIe25mdJRXwhXUXdZ6S3k",authDomain:"soan-kofe-pos.firebaseapp.com",projectId:"soan-kofe-pos",storageBucket:"soan-kofe-pos.firebasestorage.app",messagingSenderId:"249544586312",appId:"1:249544586312:web:cad2e6e950dcba270fd47d"};
+const FB_URL='https://www.gstatic.com/firebasejs/10.12.2/';
+const SYNC_KEY='soankofe.pos.sync',SYNC_BASE='soankofe.pos.syncbase';
+const SYNC_COLLS=['users','categories','products','customers','sales','held','stockLog','ingredients','ingLog','shifts'];
+const SG={cfg:null,base:{},A:null,AU:null,F:null,fs:null,col:null,unsub:null,state:'off',err:'',lastOk:0,timer:null,rTimer:null,busy:false,started:false};
+function syncCfgLoad(){try{SG.cfg=JSON.parse(lsGet(SYNC_KEY)||'null')}catch(e){SG.cfg=null}try{SG.base=JSON.parse(lsGet(SYNC_BASE)||'{}')||{}}catch(e){SG.base={}}}
+function syncCfgSave(){lsSet(SYNC_KEY,JSON.stringify(SG.cfg))}
+function syncBaseSave(){lsSet(SYNC_BASE,JSON.stringify(SG.base))}
+const syncOn=()=>!!(SG.cfg&&SG.cfg.on&&SG.cfg.code);
+function hashStr(s){let h1=0xdeadbeef,h2=0x41c6ce57;for(let i=0;i<s.length;i++){const c=s.charCodeAt(i);h1=Math.imul(h1^c,2654435761);h2=Math.imul(h2^c,1597334677)}h1=Math.imul(h1^(h1>>>16),2246822507)^Math.imul(h2^(h2>>>13),3266489909);h2=Math.imul(h2^(h2>>>16),2246822507)^Math.imul(h1^(h1>>>13),3266489909);return(h2>>>0).toString(36)+(h1>>>0).toString(36)}
+const docId=k=>k.replace(/\//g,'_');
+function syncRecs(d){
+  const m=new Map();
+  SYNC_COLLS.forEach(c=>(d[c]||[]).forEach(x=>{if(!x||typeof x!=='object')return;if(x.id==null||x.id==='')x.id=uid();m.set(c+'~'+x.id,x)}));
+  m.set('settings',d.settings);m.set('seq',d.seq||{sale:0});m.set('meta',{v:d.v||2,demo:!!d.demo});
+  return m;
+}
+function syncApply(v){
+  const k=v.k;if(!k)return;let x=null;
+  if(!v.del){try{x=JSON.parse(v.j)}catch(e){return}}
+  if(k==='settings'){if(x)db.settings=x}
+  else if(k==='seq'){if(x){db.seq=db.seq||{sale:0};db.seq.sale=Math.max(+db.seq.sale||0,+x.sale||0);x=db.seq}}
+  else if(k==='meta'){if(x){db.demo=!!x.demo;x={v:db.v||2,demo:!!db.demo}}}
+  else{
+    const i=k.indexOf('~'),c=k.slice(0,i),id=k.slice(i+1);if(!SYNC_COLLS.includes(c))return;
+    const arr=db[c]||(db[c]=[]),idx=arr.findIndex(e=>e&&String(e.id)===id);
+    if(v.del){if(idx>=0)arr.splice(idx,1)}
+    else if(idx>=0)arr[idx]=x;
+    else{const t=x.ts!=null?x.ts:x.openTs;let j=arr.length;if(t!=null)while(j>0&&arr[j-1]&&(arr[j-1].ts!=null?arr[j-1].ts:arr[j-1].openTs)>t)j--;arr.splice(j,0,x)}
+  }
+  if(v.del)delete SG.base[k];else SG.base[k]=hashStr(JSON.stringify(x));
+}
+function syncState(s,err){SG.state=s;if(err!==undefined)SG.err=err;const p=$('#sync-pill');if(p)p.outerHTML=syncPill();const c=$('#sync-status');if(c)c.innerHTML=syncStatusText()}
+function syncPill(){
+  if(!syncOn())return '';
+  const off=SG.state==='offline'||!navigator.onLine,bad=SG.state==='error';
+  return '<span id="sync-pill" class="pill '+(bad?'bad':off?'amber':'ok')+'" title="Sinkron antar perangkat">'+(bad?'Sinkron gagal':off?'Offline':SG.state==='live'?'Tersinkron':'Menyambung…')+'</span>';
+}
+function syncStatusText(){
+  if(!syncOn())return 'Mati. Data hanya ada di perangkat ini.';
+  const t=SG.lastOk?' · terakhir '+fmtTime(SG.lastOk):'';
+  if(SG.state==='error')return '<b style="color:var(--bad)">Gagal:</b> '+esc(SG.err||'tidak diketahui');
+  if(SG.state==='offline'||!navigator.onLine)return 'Offline. Perubahan disimpan dan dikirim otomatis saat internet kembali'+t+'.';
+  if(SG.state==='live')return 'Aktif, kode toko <b>'+esc(SG.cfg.code)+'</b>'+t+'.';
+  return 'Menyambung ke server…';
+}
+async function syncLoadSDK(){
+  if(SG.F)return;
+  const [A,AU,F]=await Promise.all([import(FB_URL+'firebase-app.js'),import(FB_URL+'firebase-auth.js'),import(FB_URL+'firebase-firestore.js')]);
+  const app=A.initializeApp(FB_CFG);
+  let fs;try{fs=F.initializeFirestore(app,{localCache:F.persistentLocalCache({tabManager:F.persistentMultipleTabManager()})})}catch(e){fs=F.getFirestore(app)}
+  SG.A=A;SG.AU=AU;SG.F=F;SG.fs=fs;SG.auth=AU.getAuth(app);
+}
+async function syncAuth(){
+  const u=await new Promise(res=>{const un=SG.AU.onAuthStateChanged(SG.auth,x=>{un();res(x)})});
+  if(u)return u;
+  const r=await SG.AU.signInAnonymously(SG.auth);return r.user;
+}
+function syncErrMsg(e){
+  const c=(e&&e.code)||'',m=(e&&e.message)||String(e);
+  if(/permission/i.test(c+m))return 'Akses ditolak server. Pastikan Rules Firestore sudah dipasang.';
+  if(/admin-restricted|operation-not-allowed/i.test(c+m))return 'Login Anonymous belum diaktifkan di Firebase Authentication.';
+  if(/network|unavailable|failed to fetch|import/i.test(c+m))return 'Tidak bisa terhubung ke server. Periksa internet.';
+  return m.slice(0,140);
+}
+async function syncConnect(){
+  await syncLoadSDK();await syncAuth();
+  SG.col=SG.F.collection(SG.fs,'stores',SG.cfg.code,'items');
+}
+function syncListen(){
+  const F=SG.F;if(SG.unsub){SG.unsub();SG.unsub=null}
+  const q=F.query(SG.col,F.where('u','>',F.Timestamp.fromMillis(SG.cfg.last||0)),F.orderBy('u'));
+  SG.unsub=F.onSnapshot(q,snap=>{
+    let ch=false,max=SG.cfg.last||0;
+    snap.docChanges().forEach(c=>{
+      if(c.type==='removed')return;
+      const d=c.doc;if(d.metadata&&d.metadata.hasPendingWrites)return;
+      const v=d.data(),t=v.u&&v.u.toMillis?v.u.toMillis():0;if(t>max)max=t;
+      if(v.dev===SG.cfg.dev)return;
+      syncApply(v);ch=true;
+    });
+    if(max>(SG.cfg.last||0)){SG.cfg.last=max;syncCfgSave()}
+    SG.lastOk=Date.now();
+    if(ch){lsSet(LS_KEY,JSON.stringify(db));syncBaseSave();syncAfterRemote()}
+    syncState('live','');
+  },e=>{syncState('error',syncErrMsg(e))});
+}
+function syncAfterRemote(){
+  if(S.user){const u=userById(S.user.id);if(!u){logout();return}S.user=u}
+  clearTimeout(SG.rTimer);
+  const busy=()=>$('#modal-root').firstChild||(document.activeElement&&/INPUT|TEXTAREA|SELECT/.test(document.activeElement.tagName)&&document.activeElement.closest('#app'));
+  const tryR=()=>{if(busy()){SG.rTimer=setTimeout(tryR,1500);return}render()};
+  tryR();
+}
+function syncSchedule(){if(!syncOn()||!SG.col)return;clearTimeout(SG.timer);SG.timer=setTimeout(syncPush,400)}
+async function syncPush(){
+  if(!syncOn()||!SG.col)return;
+  const F=SG.F,m=syncRecs(db),ops=[];
+  for(const [k,x] of m){const j=JSON.stringify(x),h=hashStr(j);if(SG.base[k]!==h){ops.push({k,j,h,prev:SG.base[k]});SG.base[k]=h}}
+  for(const k of Object.keys(SG.base))if(!m.has(k)){ops.push({k,del:true,prev:SG.base[k]});delete SG.base[k]}
+  if(!ops.length)return;
+  syncBaseSave();
+  for(let i=0;i<ops.length;i+=400){
+    const part=ops.slice(i,i+400),b=F.writeBatch(SG.fs);
+    part.forEach(o=>b.set(F.doc(SG.col,docId(o.k)),{k:o.k,j:o.del?'':o.j,del:!!o.del,u:F.serverTimestamp(),dev:SG.cfg.dev}));
+    b.commit().then(()=>{SG.lastOk=Date.now();if(SG.state!=='error')syncState(navigator.onLine?'live':'offline')}).catch(e=>{
+      part.forEach(o=>{if(o.prev===undefined)delete SG.base[o.k];else SG.base[o.k]=o.prev+'!'});syncBaseSave();
+      syncState('error',syncErrMsg(e));
+    });
+  }
+}
+async function syncStart(){
+  if(!syncOn()||SG.started)return;SG.started=true;
+  syncState(navigator.onLine?'connecting':'offline');
+  try{await syncConnect();syncListen();syncPush()}
+  catch(e){SG.started=false;syncState(navigator.onLine?'error':'offline',syncErrMsg(e))}
+}
+function syncStop(){if(SG.unsub){SG.unsub();SG.unsub=null}SG.started=false;SG.col=null;syncState('off','')}
+addEventListener('online',()=>{if(syncOn()){if(!SG.started)syncStart();else syncState(SG.state==='error'?'error':'live')}});
+addEventListener('offline',()=>{if(syncOn())syncState('offline')});
+
+function syncCardHTML(){
+  const on=syncOn();
+  return '<div class="card"><div class="card-h"><h3>Sinkron antar perangkat</h3>'+(on?'<span class="pill ok">Aktif</span>':'')+'</div><div class="form">'
+   +'<p class="muted" id="sync-status">'+syncStatusText()+'</p>'
+   +(on?'<button class="btn ghost" data-act="sync-now">Sinkron sekarang</button><button class="btn danger" data-act="sync-off">Matikan sinkron di perangkat ini</button>'
+       :'<p class="muted">Hubungkan tablet, laptop, dan HP agar transaksi, shift, stok, dan menu tampil sama secara real-time. Semua perangkat memakai kode toko yang sama.</p><button class="btn primary" data-act="sync-on">Aktifkan sinkron</button>')
+   +'</div></div>';
+}
+ACT['sync-on']=()=>modal({title:'Aktifkan sinkron',body:'<p class="muted">Buat kode toko rahasia (minimal 8 karakter: huruf kecil, angka, tanda -). Masukkan kode yang <b>sama persis</b> di setiap perangkat. Kode ini berfungsi seperti kata sandi data toko.</p><div class="fld"><label class="lbl" for="sync-code">Kode toko</label><input class="in" id="sync-code" autocomplete="off" autocapitalize="none" placeholder="contoh: soankofe-lebakbulus-27"></div><p class="muted">Aktifkan lebih dulu di perangkat yang datanya paling lengkap (tablet kasir).</p>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="sync-go">Lanjut</button>'});
+ACT['sync-go']=async el=>{
+  const code=($('#sync-code').value||'').trim().toLowerCase();
+  if(!/^[a-z0-9-]{8,40}$/.test(code)){toast('Kode minimal 8 karakter: huruf kecil, angka, atau tanda -');return}
+  el.disabled=true;el.textContent='Memeriksa…';
+  SG.cfg={on:false,code,dev:(SG.cfg&&SG.cfg.dev)||'d-'+uid(),last:0};
+  try{
+    await syncConnect();
+    const F=SG.F,one=await F.getDocs(F.query(SG.col,F.limit(1)));
+    if(one.empty){
+      confirmBox('Jadikan data awal toko','Kode ini masih kosong di server. Data di perangkat ini ('+db.sales.length+' transaksi, '+db.products.length+' produk) akan diunggah menjadi data toko, lalu perangkat lain cukup memakai kode yang sama.','Unggah data ini',()=>{
+        SG.base={};syncBaseSave();SG.cfg.on=true;SG.cfg.last=0;syncCfgSave();SG.started=true;syncListen();syncPush();render();toast('Sinkron aktif. Data sedang diunggah.');
+      },false);
+    }else{
+      confirmBox('Ambil data toko','Kode ini sudah berisi data toko. Data di perangkat ini akan <b>diganti</b> dengan data dari server. Data lama disimpan dulu sebagai cadangan otomatis di Pengaturan, bagian Data.','Ambil data toko',async()=>{
+        toast('Mengunduh data toko…');
+        try{
+          const all=await F.getDocs(SG.col);
+          snapshotNow('Sebelum sinkron pertama');
+          const keep=db.settings;
+          db={v:2,settings:keep,users:[],categories:[],products:[],customers:[],sales:[],held:[],stockLog:[],ingredients:[],ingLog:[],shifts:[],seq:{sale:0},demo:false};
+          SG.base={};let max=0;
+          all.docs.forEach(d=>{const v=d.data(),t=v.u&&v.u.toMillis?v.u.toMillis():0;if(t>max)max=t;if(!v.del)syncApply(v)});
+          migrate(db);if(!db.users.length){db=JSON.parse(lsGet(SNAP_KEY));throw new Error('Data toko di server tidak lengkap')}
+          SG.cfg.on=true;SG.cfg.last=max;syncCfgSave();syncBaseSave();lsSet(LS_KEY,JSON.stringify(db));
+          SG.started=true;syncListen();resetPos();
+          if(S.user){const u=userById(S.user.id);if(u)S.user=u;else{logout();toast('Data toko dimuat. Silakan masuk lagi.');return}}
+          render();toast('Sinkron aktif. Data toko dimuat.');
+        }catch(e){SG.cfg.on=false;syncCfgSave();syncState('error',syncErrMsg(e));toast(syncErrMsg(e))}
+      },false);
+    }
+  }catch(e){closeModal();SG.cfg.on=false;syncCfgSave();toast(syncErrMsg(e))}
+};
+ACT['sync-now']=()=>{if(!SG.started)syncStart();else{syncPush();syncListen()}toast('Menyinkronkan…')};
+ACT['sync-off']=()=>confirmBox('Matikan sinkron','Perangkat ini berhenti menerima dan mengirim perubahan. Data yang sudah ada tetap tersimpan di perangkat ini.','Matikan',()=>{SG.cfg.on=false;syncCfgSave();syncStop();render();toast('Sinkron dimatikan di perangkat ini')});
+const _resetDemo=ACT['reset-demo'];ACT['reset-demo']=()=>{if(syncOn()){toast('Matikan sinkron dulu sebelum reset ke data contoh, agar perangkat lain tidak ikut ter-reset');return}_resetDemo()};
+
 /* ========== boot ========== */
 (function init(){
   const t=lsGet(THEME_KEY);if(t==='dark'||t==='light')document.documentElement.setAttribute('data-theme',t);
   probeStorage();
+  syncCfgLoad();
   load();
   const sid=lsGet(SESSION_KEY),u=sid?userById(sid):null;if(u)S.user=u;
   render();
+  syncStart();
 })();
 })();
 </script>
