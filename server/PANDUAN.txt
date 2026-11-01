@@ -94,6 +94,15 @@ MEMULIHKAN SERVER (misalnya komputer server rusak/diganti):
   dan transaksi otomatis terkirim begitu server menyala lagi.
 
 
+H. PEMBARUAN OTOMATIS DARI GITHUB
+---------------------------------
+Bila komputer server tersambung internet, server memeriksa repo GitHub setiap 10 menit dan
+mengambil versi terbaru aplikasi (index.html, sw.js, manifest, soan-config.json), termasuk
+perubahan tampilan yang di-Push dari Panel Developer. File yang rusak tidak akan dipasang, dan
+versi sebelumnya disimpan di data/app-sebelumnya. Data toko tidak tersentuh.
+Untuk mematikan, buat/ubah pengaturan.json:  { "updateDariGithub": false }
+
+
 G. MASALAH UMUM
 ---------------
 - Perangkat tidak bisa membuka alamat server:

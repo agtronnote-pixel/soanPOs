@@ -1,0 +1,131 @@
+{
+  "versi": 1,
+  "catatan": "Diatur dari Panel Developer (developer/). Boleh diedit manual; nilai yang tidak valid diabaikan.",
+  "tema": {
+    "aksen": "#F2A31B",
+    "aksenGelap": "#F5AE2E",
+    "sidebar": "#151412",
+    "latar": "#F6EFE6"
+  },
+  "menu": [
+    {
+      "id": "pos",
+      "label": "Kasir",
+      "tampil": true,
+      "kasir": true
+    },
+    {
+      "id": "sales",
+      "label": "Transaksi",
+      "tampil": true,
+      "kasir": true
+    },
+    {
+      "id": "menu",
+      "label": "Menu & Bahan",
+      "short": "Menu",
+      "tampil": true,
+      "kasir": false
+    },
+    {
+      "id": "reports",
+      "label": "Laporan",
+      "tampil": true,
+      "kasir": false
+    },
+    {
+      "id": "customers",
+      "label": "Pelanggan",
+      "tampil": true,
+      "kasir": true
+    },
+    {
+      "id": "shift",
+      "label": "Shift",
+      "tampil": true,
+      "kasir": true
+    },
+    {
+      "id": "settings",
+      "label": "Pengaturan",
+      "tampil": true,
+      "kasir": false
+    }
+  ],
+  "kasir": {
+    "ukuranKartu": "normal",
+    "tipePesanan": [
+      {
+        "id": "dine",
+        "label": "Dine in",
+        "tampil": true
+      },
+      {
+        "id": "take",
+        "label": "Take away",
+        "tampil": true
+      },
+      {
+        "id": "delivery",
+        "label": "Delivery",
+        "tampil": true
+      }
+    ],
+    "metodeBayar": [
+      {
+        "id": "cash",
+        "label": "Tunai",
+        "tampil": true
+      },
+      {
+        "id": "qris",
+        "label": "QRIS",
+        "tampil": true
+      },
+      {
+        "id": "debit",
+        "label": "Debit",
+        "tampil": true
+      },
+      {
+        "id": "transfer",
+        "label": "Transfer",
+        "tampil": true
+      }
+    ]
+  },
+  "laporan": [
+    {
+      "id": "trend",
+      "tampil": true
+    },
+    {
+      "id": "top",
+      "tampil": true
+    },
+    {
+      "id": "cats",
+      "tampil": true
+    },
+    {
+      "id": "gp",
+      "tampil": true
+    },
+    {
+      "id": "use",
+      "tampil": true
+    },
+    {
+      "id": "hours",
+      "tampil": true
+    },
+    {
+      "id": "pay",
+      "tampil": true
+    }
+  ],
+  "teks": {
+    "hashtag": "#monggosoan.",
+    "judulLogin": "Login to Access"
+  }
+}

@@ -7,7 +7,7 @@
 'use strict';
 const http = require('http'), fs = require('fs'), path = require('path'), os = require('os'), url = require('url'), zlib = require('zlib');
 
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 const PORT = +process.env.PORT || 8080;
 const HERE = __dirname;
 const APP_DIR = [path.join(HERE, 'app'), path.join(HERE, '..')].find(d => fs.existsSync(path.join(d, 'index.html')));
@@ -97,6 +97,41 @@ function driveBackup() {
   } catch (e) { Object.assign(drive, { root: T, err: e.message }); console.error('Cadangan Google Drive gagal:', e.message); }
 }
 setInterval(driveBackup, 10 * 60 * 1000);
+
+/* ---------- pembaruan aplikasi otomatis dari GitHub ----------
+   Bila komputer server tersambung internet, server mengambil versi terbaru aplikasi
+   (hasil Push dari Panel Developer) dari repo GitHub setiap 10 menit. File lama disimpan di
+   data/app-sebelumnya. Matikan dengan "updateDariGithub": false di pengaturan.json. */
+const UPD = { on: CFG.updateDariGithub !== false && !!APP_DIR && path.resolve(APP_DIR) === path.resolve(HERE, 'app'),
+  base: process.env.SOAN_UPDATE_BASE || ('https://raw.githubusercontent.com/' + (CFG.repoGithub || 'agtronnote-pixel/soanPOs') + '/' + (CFG.branchGithub || 'main') + '/'),
+  last: 0, lastUpdate: 0, err: null, files: [] };
+const jsonOk = t => { try { return typeof JSON.parse(t) === 'object'; } catch (e) { return false; } };
+const APP_FILES = [
+  ['index.html', t => t.length > 50000 && t.includes('<title>Soan Kofe POS</title>')],
+  ['sw.js', t => t.includes('VERSI') && t.includes('addEventListener')],
+  ['manifest.webmanifest', jsonOk],
+  ['soan-config.json', jsonOk]
+];
+async function updateApp() {
+  if (!UPD.on || typeof fetch !== 'function') return;
+  UPD.last = Date.now(); const changed = [], errs = [];
+  for (const [name, ok] of APP_FILES) {
+    try {
+      const r = await fetch(UPD.base + name + '?t=' + Date.now(), { cache: 'no-store', signal: AbortSignal.timeout(20000) });
+      if (r.status === 404) continue;
+      if (!r.ok) throw new Error('GitHub menjawab ' + r.status);
+      const t = await r.text();
+      if (!ok(t)) throw new Error('isi tidak valid, dilewati');
+      const dst = path.join(APP_DIR, name); let cur = null; try { cur = fs.readFileSync(dst, 'utf8'); } catch (e) {}
+      if (cur === t) continue;
+      if (cur != null) { const bdir = path.join(DATA_DIR, 'app-sebelumnya'); fs.mkdirSync(bdir, { recursive: true }); fs.writeFileSync(path.join(bdir, name), cur); }
+      fs.writeFileSync(dst + '.tmp', t); fs.renameSync(dst + '.tmp', dst); changed.push(name);
+    } catch (e) { errs.push(name + ': ' + (e.name === 'TimeoutError' ? 'waktu habis' : e.message)); }
+  }
+  UPD.err = errs.length ? errs.join('; ') : null;
+  if (changed.length) { UPD.lastUpdate = Date.now(); UPD.files = changed; console.log('  Aplikasi diperbarui dari GitHub: ' + changed.join(', ')); }
+}
+setInterval(updateApp, 10 * 60 * 1000);
 
 /* ---------- arsip .zip (tanpa paket tambahan) ---------- */
 const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
@@ -217,7 +252,7 @@ function listFiles() {
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true), p = decodeURIComponent(u.pathname), q = u.query;
   try {
-    if (p === '/api/info') return send(res, 200, { name: 'soan-server', version: VERSION, hasData: !!store.code, items: Object.keys(store.items).length, drive: { on: !!drive.root && !drive.err, last: drive.last, err: drive.err, files: drive.files, folder: drive.root ? path.basename(path.dirname(drive.root)) + '/SoanKofe-Cadangan' : null } });
+    if (p === '/api/info') return send(res, 200, { name: 'soan-server', version: VERSION, hasData: !!store.code, items: Object.keys(store.items).length, app: { auto: UPD.on, last: UPD.last, lastUpdate: UPD.lastUpdate, files: UPD.files, err: UPD.err }, drive: { on: !!drive.root && !drive.err, last: drive.last, err: drive.err, files: drive.files, folder: drive.root ? path.basename(path.dirname(drive.root)) + '/SoanKofe-Cadangan' : null } });
 
     if (p.startsWith('/api/')) {
       const auth = checkCode(req, q);
@@ -309,7 +344,9 @@ server.listen(PORT, '0.0.0.0', () => {
   driveBackup();
   console.log('  ' + (drive.root ? 'Cadangan Google Drive: ' + drive.root : 'Google Drive for desktop tidak ditemukan; cadangan hanya di komputer ini.'));
   console.log('  ' + (store.code ? 'Data toko: ' + Object.keys(store.items).length + ' catatan.' : 'Belum ada data toko. Aktifkan sinkron dari tablet kasir.'));
+  console.log('  ' + (UPD.on ? 'Pembaruan otomatis dari GitHub: aktif (tiap 10 menit bila ada internet).' : 'Pembaruan otomatis dari GitHub: mati.'));
   console.log('  Biarkan jendela ini terbuka selama kedai beroperasi.\n');
+  updateApp();
 });
 server.on('error', e => { console.error(e.code === 'EADDRINUSE' ? 'Port ' + PORT + ' sudah dipakai. Server mungkin sudah berjalan di jendela lain.' : e.message); process.exit(1); });
 const bye = () => { try { saveStore(true); } catch (e) {} process.exit(0); };

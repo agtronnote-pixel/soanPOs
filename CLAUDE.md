@@ -7,6 +7,10 @@ semua teks aplikasi, pesan commit, komentar Issue/PR ditulis dalam **bahasa Indo
 - `index.html` — seluruh aplikasi (HTML + CSS + JS dalam satu file, tanpa framework, tanpa build).
 - `sw.js` — service worker (offline). **Naikkan `VERSI`** (mis. soankofe-v5 → v6) setiap kali file aplikasi berubah.
 - `manifest.webmanifest`, `icons/` — PWA.
+- `soan-config.json` — pengaturan tampilan (menu, tipe pesanan, metode bayar, kartu laporan, warna, teks) yang dibuat
+  Panel Developer; dibaca POS lewat `loadConfig()`/`applyConfig()`. Nilai tidak valid diabaikan.
+- `developer/index.html` — Panel Developer (drag & drop + Push ke GitHub lewat API). POS punya mode `?preview=1`
+  (penyimpanan hanya di memori) untuk pratinjau panel.
 - `server/server.js` — Server Lokal (Node.js, tanpa paket tambahan): sinkron real-time (SSE),
   berkas, laporan CSV, cadangan Google Drive & .zip. Lihat `server/PANDUAN.txt`.
 - Situs dipublikasikan oleh GitHub Pages dari branch `main`.

@@ -1,6 +1,6 @@
 /* Service worker Soan Kofe POS: aplikasi tetap terbuka tanpa internet.
    Naikkan nomor VERSI saat Anda mengunggah versi baru agar cache lama dibersihkan. */
-const VERSI = 'soankofe-v5';
+const VERSI = 'soankofe-v6';
 const INTI = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
@@ -16,6 +16,12 @@ self.addEventListener('fetch', e => {
   /* Jangan cache koneksi ke server (data & berkas); hanya file aplikasi dan font. */
   const h = new URL(r.url).hostname;
   if (h === self.location.hostname && /\/(api|files)\//.test(new URL(r.url).pathname)) return;
+  /* Panel Developer selalu dari jaringan; konfigurasi tampilan: jaringan dulu, cadangan dari cache. */
+  if (h === self.location.hostname && /\/developer\//.test(new URL(r.url).pathname)) return;
+  if (h === self.location.hostname && /\/soan-config\.json$/.test(new URL(r.url).pathname)) {
+    e.respondWith(fetch(r).then(res => { if (res.ok) { const cp = res.clone(); caches.open(VERSI).then(c => c.put(r, cp)); } return res; }).catch(() => caches.match(r, { ignoreSearch: true })));
+    return;
+  }
   if (h !== self.location.hostname && !/^(fonts\.googleapis\.com|fonts\.gstatic\.com)$/.test(h)) return;
   e.respondWith(caches.match(r, { ignoreSearch: true }).then(hit => {
     const net = fetch(r).then(res => {
