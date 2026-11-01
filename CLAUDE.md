@@ -25,5 +25,7 @@ semua teks aplikasi, pesan commit, komentar Issue/PR ditulis dalam **bahasa Indo
 - Ikuti gaya kode yang ada (fungsi kecil, `ACT[...]` untuk aksi tombol, `VIEWS[...]` untuk halaman, `esc()` untuk teks pengguna).
 - Tampilan harus rapi di HP (390px), tablet, dan laptop.
 - Sebelum selesai: cek sintaks (`node -e` memuat setiap `<script>` dengan `new Function`), `node --check sw.js server/server.js`.
-- Selesai bekerja: balas di Issue dengan ringkasan singkat (apa yang berubah, cara mencobanya) dan link Pull Request.
-  Jangan push langsung ke `main`.
+- Keputusan pemilik (1 Nov 2026): update **langsung di-push ke `main`** tanpa Pull Request/konfirmasi.
+  Sebelum push: ambil versi terbaru (`git fetch` + rebase), uji dulu, tulis pesan commit yang jelas, naikkan `VERSI` di `sw.js`
+  bila file aplikasi berubah. Setelah push, laporkan ringkasan perubahan ke pemilik.
+- Bila bekerja dari Issue (GitHub Actions): balas di Issue dengan ringkasan singkat dan cara mencobanya.
