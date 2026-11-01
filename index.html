@@ -72,6 +72,7 @@ button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-vis
 .form{display:flex;flex-direction:column;gap:14px}
 .chk{display:flex;align-items:center;gap:10px;font-weight:600;cursor:pointer}
 .chk input{width:18px;height:18px;accent-color:var(--amber)}
+.ak-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}.ak-grid .chk{font-weight:500}@media (max-width:420px){.ak-grid{grid-template-columns:1fr}}
 
 .pill{display:inline-flex;align-items:center;gap:6px;padding:3px 10px;border-radius:999px;font:600 11px/1.4 var(--font-body);background:var(--surface-2);color:var(--muted);border:1px solid var(--line);white-space:nowrap}
 a.btn{text-decoration:none}
@@ -569,6 +570,15 @@ const userById=id=>db.users.find(u=>u.id===id);
 const catName=id=>(db.categories.find(c=>c.id===id)||{}).name||'Tanpa kategori';
 const curShift=()=>db.shifts.find(s=>!s.closeTs);
 const isOwner=()=>S.user&&S.user.role==='owner';
+/* status pengguna & hak akses. role tetap 'owner'/'cashier' agar versi lama tetap paham; status & akses adalah tambahan */
+const STATUS={owner:{label:'Owner',akses:null},manager:{label:'Manager',akses:['pos','sales','menu','reports','customers','shift','finance','void']},kasir:{label:'Kasir',akses:['pos','sales','customers','shift']},barista:{label:'Barista',akses:['pos','sales','shift']}};
+const AKSES=[['pos','Kasir (jualan)'],['sales','Transaksi'],['customers','Pelanggan'],['shift','Shift & rekap'],['menu','Menu & Bahan'],['reports','Laporan'],['finance','Keuangan'],['void','Batalkan transaksi']];
+const AKSES_KEYS=AKSES.map(a=>a[0]);
+const userStatus=u=>u&&STATUS[u.status]?u.status:(u&&u.role==='owner'?'owner':'kasir');
+const statusLabel=u=>STATUS[userStatus(u)].label;
+function canDo(k,u){u=u||S.user;if(!u)return false;if(u.role==='owner')return true;if(u.akses&&typeof u.akses==='object')return !!u.akses[k];return STATUS.kasir.akses.includes(k)}
+function pageOk(n,u){u=u||S.user;if(!n||!u||!n.roles||!n.roles.length)return false;if(u.role==='owner')return n.roles.includes('owner');if(n.id==='settings')return false;if(u.akses&&AKSES_KEYS.includes(n.id))return !!u.akses[n.id];return n.roles.includes('cashier')}
+function aksesText(u){if(u.role==='owner')return 'akses penuh';const l=AKSES.filter(a=>canDo(a[0],u)).map(a=>a[1].replace(' (jualan)',''));return l.length?l.join(', '):'belum ada akses'}
 
 /* ========== modal & toast ========== */
 let tt;
@@ -597,14 +607,14 @@ const NAV=[
  {id:'finance',label:'Keuangan',icon:'wallet',roles:['owner']},
  {id:'settings',label:'Pengaturan',icon:'gear',roles:['owner']}
 ];
-const allowedNav=()=>NAV.filter(n=>n.roles.includes(S.user.role));
+const allowedNav=()=>NAV.filter(n=>pageOk(n,S.user));
 /* pohon menu untuk peran yang sedang masuk (grup kosong otomatis disembunyikan) */
 function navTree(){
-  const role=S.user.role;
+  const u=S.user,staf=u.role!=='owner',bebas=staf&&u.akses&&typeof u.akses==='object';
   const f=l=>l.map(n=>{
-    if(n.kind==='group'){if(role==='cashier'&&!n.kasir)return null;const c=f(n.children);return c.length?Object.assign({},n,{children:c}):null}
-    if(n.kind==='link')return role==='cashier'&&!n.kasir?null:n;
-    const v=NAV.find(x=>x.id===n.id);return v&&v.roles.includes(role)?Object.assign({},n,{label:v.label,short:v.short,icon:v.icon}):null;
+    if(n.kind==='group'){if(staf&&!bebas&&!n.kasir)return null;const c=f(n.children);return c.length?Object.assign({},n,{children:c}):null}
+    if(n.kind==='link')return staf&&!n.kasir?null:n;
+    const v=NAV.find(x=>x.id===n.id);return v&&pageOk(v,u)?Object.assign({},n,{label:v.label,short:v.short,icon:v.icon}):null;
   }).filter(Boolean);
   return f(NAVTREE);
 }
@@ -728,7 +738,7 @@ const SUBS={finance:'Kas Drawer & Dompet, jurnal kas, dan rekap penjualan',pos:'
 
 function loginHTML(){
   const L=S.login,u=L.uid?userById(L.uid):null;
-  const tiles=db.users.map(x=>'<button class="u-tile'+(x.id===L.uid?' on':'')+'" data-act="pick-user" data-id="'+x.id+'"><span class="avatar">'+esc(x.name.charAt(0))+'</span><span><b>'+esc(x.name)+'</b><span>'+(x.role==='owner'?'Pemilik':'Kasir')+'</span></span></button>').join('');
+  const tiles=db.users.map(x=>'<button class="u-tile'+(x.id===L.uid?' on':'')+'" data-act="pick-user" data-id="'+x.id+'"><span class="avatar">'+esc(x.name.charAt(0))+'</span><span><b>'+esc(x.name)+'</b><span>'+esc(statusLabel(x))+'</span></span></button>').join('');
   let pin='';
   if(u){
     const dots='<div class="pin-dots'+(L.err?' err':'')+'">'+[0,1,2,3].map(i=>'<i class="'+(i<L.pin.length?'f':'')+'"></i>').join('')+'</div>';
@@ -770,7 +780,7 @@ function shellHTML(inner){
   const cur=NAV.find(n=>n.id===S.view);
   const shiftTxt=sh?'<span class="dot"></span><b>Shift terbuka</b><span>sejak '+fmtTime(sh.openTs)+' · '+esc((userById(sh.userId)||{name:'-'}).name)+'</span>':'<span class="dot off"></span><b>Shift belum dibuka</b>';
   const dark=(document.documentElement.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'))==='dark';
-  return '<div class="app"><aside class="side"><div class="brand">'+mark('mark-sm')+wordmark+'</div><nav class="nav">'+side+'</nav><div class="side-foot"><div class="shift-card">'+shiftTxt+'</div><div class="user-chip"><span class="avatar">'+esc(u.name.charAt(0))+'</span><div class="who"><b>'+esc(u.name)+'</b><span>'+(u.role==='owner'?'Pemilik':'Kasir')+'</span></div><button class="icon-btn" data-act="logout" aria-label="Keluar">'+ico('logout')+'</button></div></div></aside>'
+  return '<div class="app"><aside class="side"><div class="brand">'+mark('mark-sm')+wordmark+'</div><nav class="nav">'+side+'</nav><div class="side-foot"><div class="shift-card">'+shiftTxt+'</div><div class="user-chip"><span class="avatar">'+esc(u.name.charAt(0))+'</span><div class="who"><b>'+esc(u.name)+'</b><span>'+esc(statusLabel(u))+'</span></div><button class="icon-btn" data-act="logout" aria-label="Keluar">'+ico('logout')+'</button></div></div></aside>'
    +'<div class="main-wrap"><header class="top">'+mark('mark-sm only-m')+'<div class="ttl"><h1>'+esc(cur?cur.label:'')+'</h1><div class="sub">'+esc(new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}))+'</div></div>'
    +(db.demo?'<span class="pill amber">Data contoh</span>':'')+syncPill()
    +printerBtn()+'<button class="icon-btn" data-act="theme" aria-label="Ganti tema">'+ico(dark?'sun':'moon')+'</button><button class="icon-btn only-m" data-act="logout" aria-label="Keluar">'+ico('logout')+'</button></header><main class="content" id="main">'+inner+'</main></div><nav class="tabbar" aria-label="Menu utama">'+tab+'</nav></div>';
@@ -921,7 +931,7 @@ function receiptText(s){
   return out.join('\n');
 }
 function showReceipt(s,fresh){
-  modal({title:fresh?'Pembayaran berhasil':'Struk '+s.no,body:receiptHTML(s),foot:(printerCfg().mode!=='off'?'<button class="btn dark" data-act="print-sale" data-id="'+s.id+'">'+ico('receipt')+'Cetak</button>':'')+'<button class="btn ghost" data-act="copy-receipt" data-id="'+s.id+'">'+ico('copy')+'Salin struk</button>'+(!fresh&&isOwner()&&s.status==='paid'?'<button class="btn danger" data-act="void-ask" data-id="'+s.id+'">Batalkan transaksi</button>':'')+'<button class="btn primary" data-act="close">'+(fresh?'Pesanan baru':'Tutup')+'</button>'});
+  modal({title:fresh?'Pembayaran berhasil':'Struk '+s.no,body:receiptHTML(s),foot:(printerCfg().mode!=='off'?'<button class="btn dark" data-act="print-sale" data-id="'+s.id+'">'+ico('receipt')+'Cetak</button>':'')+'<button class="btn ghost" data-act="copy-receipt" data-id="'+s.id+'">'+ico('copy')+'Salin struk</button>'+(!fresh&&canDo('void')&&s.status==='paid'?'<button class="btn danger" data-act="void-ask" data-id="'+s.id+'">Batalkan transaksi</button>':'')+'<button class="btn primary" data-act="close">'+(fresh?'Pesanan baru':'Tutup')+'</button>'});
 }
 
 /* ========== transaksi ========== */
@@ -966,6 +976,7 @@ function voidAsk(id){
   modal({title:'Batalkan '+s.no,body:'<p class="muted">Stok produk dikembalikan dan poin pelanggan dikurangi. Transaksi tetap tercatat dengan status dibatalkan.</p><div class="fld"><label class="lbl" for="vr">Alasan</label><select class="sel" id="vr"><option>Salah input pesanan</option><option>Pelanggan membatalkan</option><option>Pembayaran gagal</option><option>Lainnya</option></select></div>',foot:'<button class="btn ghost" data-act="close">Kembali</button><button class="btn danger-solid" data-act="void-go" data-id="'+id+'">Batalkan transaksi</button>'});
 }
 function voidGo(id){
+  if(!canDo('void')){toast('Tidak punya akses membatalkan transaksi');return}
   const s=db.sales.find(x=>x.id===id);if(!s||s.status==='void')return;
   s.status='void';s.voidReason=$('#vr').value;s.voidTs=Date.now();s.voidBy=S.user.id;
   s.items.forEach(i=>{const p=prodById(i.pid);if(p&&modeOf(p)==='stock'){p.stock+=i.qty;logStock(p.id,'void',i.qty,s.no)}});
@@ -1549,15 +1560,20 @@ function shiftCloseModal(){
 /* ========== pengaturan ========== */
 VIEWS.settings=function(){
   const s=db.settings,fld=(id,l,v,ex)=>'<div class="fld"><label class="lbl" for="'+id+'">'+l+'</label><input class="in" id="'+id+'" value="'+esc(v)+'" '+(ex||'')+'></div>';
-  const users=db.users.map(u=>'<div class="list-row"><div class="l"><b>'+esc(u.name)+'</b><span class="muted">'+(u.role==='owner'?'Pemilik · akses penuh':'Kasir · kasir, transaksi, pelanggan, shift')+'</span></div><button class="btn sm ghost" data-act="user-edit" data-id="'+u.id+'">Ubah</button></div>').join('');
+  const users=db.users.map(u=>'<div class="list-row"><div class="l"><b>'+esc(u.name)+'</b><span class="muted"><b style="font-weight:600">'+esc(statusLabel(u))+'</b> · '+esc(aksesText(u))+'</span></div><button class="btn sm ghost" data-act="user-edit" data-id="'+u.id+'">Ubah</button></div>').join('');
   return '<div class="set-grid"><div class="card"><div class="card-h"><h3>Profil toko</h3></div><div class="form">'+fld('st-name','Nama toko',s.storeName)+fld('st-tag','Tagline',s.tagline)+fld('st-addr','Alamat',s.address)+fld('st-phone','Telepon',s.phone)+fld('st-foot','Pesan di bawah struk',s.footer)+fld('st-prefix','Awalan nomor struk',s.prefix,'maxlength="4"')+'<button class="btn primary" data-act="save-settings">Simpan profil</button></div></div>'
    +'<div class="card"><div class="card-h"><h3>Pajak, layanan, poin, dan stok</h3></div><div class="form"><label class="chk"><input type="checkbox" id="st-tax-on"'+(s.taxEnabled?' checked':'')+'>Kenakan PPN</label>'+fld('st-tax','Tarif PPN (%)',s.taxRate,'inputmode="numeric"')+'<label class="chk"><input type="checkbox" id="st-svc-on"'+(s.serviceEnabled?' checked':'')+'>Kenakan biaya layanan</label>'+fld('st-svc','Biaya layanan (%)',s.serviceRate,'inputmode="numeric"')+fld('st-points','Belanja per 1 poin (Rp)',s.pointsPer,'inputmode="numeric"')+'<label class="chk"><input type="checkbox" id="st-block"'+(s.blockOut?' checked':'')+'>Blokir penjualan jika bahan atau stok tidak cukup</label>'+'<button class="btn primary" data-act="save-tax">Simpan pajak</button></div></div>'
    +'<div class="card"><div class="card-h"><h3>Pengguna</h3><button class="btn sm ghost" data-act="user-new">'+ico('plus')+'Tambah</button></div>'+users+'</div>'
    +syncCardHTML()+printerCardHTML()+'<div class="card"><div class="card-h"><h3>Data</h3></div><div class="form">'+storageStatusHTML()+'<button class="btn ghost" data-act="backup">Cadangkan data</button>'+snapBtn()+'<button class="btn ghost" data-act="restore">Pulihkan dari cadangan</button><button class="btn danger" data-act="clear-demo">Hapus transaksi &amp; pelanggan contoh</button><button class="btn danger" data-act="reset-demo">Reset ke data contoh</button></div></div></div>';
 };
+function aksesHTML(st,u){
+  if(st==='owner')return '<p class="muted" style="margin:0">Owner punya akses penuh, termasuk Pengaturan dan pengguna.</p>';
+  const on=k=>u&&userStatus(u)===st?canDo(k,u):STATUS[st].akses.includes(k);
+  return '<div class="ak-grid">'+AKSES.map(a=>'<label class="chk"><input type="checkbox" data-ak="'+a[0]+'"'+(on(a[0])?' checked':'')+'>'+esc(a[1])+'</label>').join('')+'</div><p class="muted" style="margin:6px 0 0;font-size:12px">Terisi otomatis sesuai status. Centang atau hilangkan centang untuk mengubah. Pengaturan hanya untuk Owner.</p>';
+}
 function userForm(id){
-  const u=id?userById(id):{name:'',role:'cashier',pin:''};
-  modal({title:id?'Ubah pengguna':'Pengguna baru',body:'<div class="form"><div class="fld"><label class="lbl" for="uf-name">Nama</label><input class="in" id="uf-name" value="'+esc(u.name)+'"></div><div class="fld"><label class="lbl" for="uf-role">Peran</label><select class="sel" id="uf-role"><option value="cashier"'+(u.role==='cashier'?' selected':'')+'>Kasir</option><option value="owner"'+(u.role==='owner'?' selected':'')+'>Pemilik</option></select></div><div class="fld"><label class="lbl" for="uf-pin">PIN (4 angka)</label><input class="in" id="uf-pin" inputmode="numeric" maxlength="4" value="'+esc(u.pin)+'"></div></div>',foot:(id&&id!==S.user.id?'<button class="btn danger" data-act="user-del" data-id="'+id+'">Hapus</button>':'')+'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="user-save" data-id="'+(id||'')+'">Simpan</button>'});
+  const u=id?userById(id):{name:'',role:'cashier',status:'kasir',pin:''},st=userStatus(u);
+  modal({title:id?'Ubah pengguna':'Pengguna baru',body:'<div class="form"><div class="fld"><label class="lbl" for="uf-name">Nama</label><input class="in" id="uf-name" value="'+esc(u.name)+'" placeholder="Contoh: Muhammad Azwar"></div><div class="fld"><label class="lbl" for="uf-status">Status</label><select class="sel" id="uf-status" data-ch="uf-status">'+Object.keys(STATUS).map(k=>'<option value="'+k+'"'+(k===st?' selected':'')+'>'+STATUS[k].label+'</option>').join('')+'</select></div><div class="fld"><span class="lbl">Hak akses</span><div id="uf-akses">'+aksesHTML(st,id?u:null)+'</div></div><div class="fld"><label class="lbl" for="uf-pin">PIN (4 angka)</label><input class="in" id="uf-pin" inputmode="numeric" maxlength="4" value="'+esc(u.pin)+'" placeholder="0000"></div></div>',foot:(id&&id!==S.user.id?'<button class="btn danger" data-act="user-del" data-id="'+id+'">Hapus</button>':'')+'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="user-save" data-id="'+(id||'')+'">Simpan</button>'});
 }
 
 /* ========== menu & bahan baku: helper ========== */
@@ -2220,16 +2236,18 @@ ACT['save-tax']=()=>{
 };
 ACT['user-new']=()=>userForm(null);
 ACT['user-edit']=el=>userForm(el.dataset.id);
+CH['uf-status']=el=>{const b=$('#uf-akses');if(b)b.innerHTML=aksesHTML(el.value,null)};
 ACT['user-save']=el=>{
-  const id=el.dataset.id||null,name=$('#uf-name').value.trim(),pin=$('#uf-pin').value.trim(),role=$('#uf-role').value;
+  const id=el.dataset.id||null,name=$('#uf-name').value.trim(),pin=$('#uf-pin').value.trim(),status=$('#uf-status').value,role=status==='owner'?'owner':'cashier';
+  const akses={};if(role!=='owner'){$$('#uf-akses [data-ak]').forEach(c=>akses[c.dataset.ak]=c.checked);if(!AKSES_KEYS.some(k=>akses[k]&&k!=='void')){toast('Pilih minimal satu hak akses');return}}
   if(!name){toast('Nama wajib diisi');return}
   if(!/^\d{4}$/.test(pin)){toast('PIN harus 4 angka');return}
   if(id){
     const u=userById(id);
     if(u.role==='owner'&&role!=='owner'&&db.users.filter(x=>x.role==='owner').length<2){toast('Harus ada minimal satu pemilik');return}
-    Object.assign(u,{name,pin,role});
-    if(S.user.id===id)S.user=u;
-  }else db.users.push({id:'u-'+uid(),name,role,pin});
+    Object.assign(u,{name,pin,role,status});if(role==='owner')delete u.akses;else u.akses=akses;
+    if(S.user.id===id){S.user=u;if(!canView(S.view))S.view=allowedNav()[0]?allowedNav()[0].id:'pos'}
+  }else{const nu={id:'u-'+uid(),name,role,status,pin};if(role!=='owner')nu.akses=akses;db.users.push(nu)}
   save();closeModal();render();toast('Pengguna disimpan');
 };
 ACT['user-del']=el=>{const id=el.dataset.id,u=userById(id);if(u.role==='owner'&&db.users.filter(x=>x.role==='owner').length<2){toast('Harus ada minimal satu pemilik');return}confirmBox('Hapus pengguna','Pengguna tidak bisa masuk lagi. Riwayat transaksinya tetap tersimpan.','Hapus',()=>{db.users=db.users.filter(x=>x.id!==id);save();render();toast('Pengguna dihapus')})};
