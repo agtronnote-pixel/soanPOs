@@ -1198,6 +1198,55 @@ ACT['shift-recap']=el=>{const sh=db.shifts.find(x=>x.id===el.dataset.id)||curShi
 ACT['recap-copy']=()=>{const sh=recapShift();if(sh)copyText(recapText(shiftRecap(sh)))};
 ACT['recap-share']=()=>{const sh=recapShift();if(!sh)return;navigator.share({title:'Rekap shift',text:recapText(shiftRecap(sh))}).catch(()=>{})};
 ACT['recap-print']=()=>{const sh=recapShift();if(sh)printRecap(shiftRecap(sh))};
+/* ========== pengeluaran tunai: beli bahan baku (masuk stok) atau keterangan manual ========== */
+const EXP_QUICK=['Bayar parkir','Ongkir','Bensin','Galon air','Kebersihan','Gas LPG'];
+function expRecent(){const seen=new Set(),out=[];(db.cashLog||[]).slice().reverse().forEach(e=>{const l=(e.label||e.ket||'').trim();if(e.jenis!=='kredit'||e.kat!=='lain'||!l||seen.has(l.toLowerCase()))return;seen.add(l.toLowerCase());out.push(l)});return out.slice(0,12)}
+function expFormHTML(){
+  const K=S.expKind||(S.expKind='lain'),ings=db.ingredients.filter(g=>g.active!==false).sort((a,b)=>a.name.localeCompare(b.name));
+  const seg='<div class="seg" role="group" aria-label="Jenis pengeluaran" style="margin-bottom:4px"><button class="'+(K==='bahan'?'on':'')+'" data-act="exp-kind" data-v="bahan">Beli bahan baku</button><button class="'+(K==='lain'?'on':'')+'" data-act="exp-kind" data-v="lain">Lainnya</button></div>';
+  let body;
+  if(K==='bahan'){
+    const g=ingById(S.expIng)||ings[0];if(g)S.expIng=g.id;
+    body='<div class="fld"><label class="lbl" for="exp-ing">Bahan yang dibeli</label><select class="sel" id="exp-ing" data-ch="exp-ing">'+ings.map(x=>'<option value="'+x.id+'"'+(g&&x.id===g.id?' selected':'')+'>'+esc(x.name)+' · stok '+fq(x.stock)+' '+esc(x.unit)+'</option>').join('')+'</select></div>'
+      +'<div class="fld-row"><div class="fld"><label class="lbl" for="exp-qty">Jumlah ('+esc(g?g.unit:'')+')</label><input class="in" id="exp-qty" data-in="exp-live" inputmode="decimal" placeholder="0"></div><div class="fld"><label class="lbl" for="fin-amt">Total bayar (Rp)</label><input class="in" id="fin-amt" data-in="exp-live" inputmode="numeric" placeholder="0"></div></div>'
+      +'<div class="fld"><label class="lbl" for="exp-note">Catatan (opsional)</label><input class="in" id="exp-note" placeholder="Contoh: Toko Sinar Jaya"></div>'
+      +'<p class="muted" id="exp-info" style="margin:0">Stok '+esc(g?g.name:'bahan')+' akan bertambah dan HPP rata-rata diperbarui.</p>';
+    if(!ings.length)body='<p class="muted">Belum ada bahan baku. Tambahkan dulu di Menu & Bahan, atau pilih "Lainnya".</p>';
+  }else{
+    const rec=expRecent();
+    body='<div class="fld"><label class="lbl" for="fin-amt">Jumlah</label><input class="in" id="fin-amt" inputmode="numeric" placeholder="0"></div>'
+      +'<div class="fld"><label class="lbl" for="fin-ket">Keterangan</label><input class="in" id="fin-ket" list="exp-list" placeholder="Contoh: Bayar parkir"><datalist id="exp-list">'+rec.concat(EXP_QUICK.filter(q=>!rec.includes(q))).map(q=>'<option value="'+esc(q)+'">').join('')+'</datalist></div>'
+      +'<div class="chips">'+EXP_QUICK.map(q=>'<button class="chip" type="button" data-act="exp-quick" data-v="'+esc(q)+'">'+esc(q)+'</button>').join('')+'</div>';
+  }
+  return seg+body+fotoFieldHTML()+'<p class="muted" style="margin:0">Diambil dari Dompet (saldo '+rp(Math.max(0,cashBal().dompet))+'); bila kurang, sisanya dari Drawer.'+(curShift()?' Tercatat juga sebagai kas keluar shift berjalan.':'')+'</p>';
+}
+function expOpen(){S.expKind=S.expKind||'lain';modal({title:'Catat pengeluaran',body:'<div class="form" id="exp-body">'+expFormHTML()+'</div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="exp-save">Simpan</button>'})}
+function expRefresh(){const b=$('#exp-body');if(!b)return;const keep={amt:($('#fin-amt')||{}).value||'',foto:($('#fin-foto')||{}).value||''};b.innerHTML=expFormHTML();if($('#fin-amt'))$('#fin-amt').value=keep.amt;if($('#fin-foto'))$('#fin-foto').value=keep.foto}
+ACT['exp-kind']=el=>{S.expKind=el.dataset.v;expRefresh()};
+CH['exp-ing']=el=>{S.expIng=el.value;expRefresh()};
+ACT['exp-quick']=el=>{const i=$('#fin-ket');if(i){i.value=el.dataset.v;i.focus()}};
+INP['exp-live']=()=>{const g=ingById(S.expIng),q=dec(($('#exp-qty')||{}).value),a=num(($('#fin-amt')||{}).value),o=$('#exp-info');if(!o||!g)return;
+  o.textContent=q>0&&a>0?'Stok '+g.name+': '+fq(g.stock)+' → '+fq(Math.round((g.stock+q)*1000)/1000)+' '+g.unit+' · harga beli '+rpd(Math.round(a/q))+' / '+g.unit+' · HPP rata-rata baru '+rpd(newAvgCost(g,q,a/q)):'Stok '+g.name+' akan bertambah dan HPP rata-rata diperbarui.'};
+ACT['exp-save']=()=>{
+  const a=num(($('#fin-amt')||{}).value);if(a<=0){toast('Isi jumlah lebih dari 0');return}
+  const foto=fotoVal();if(foto===false)return;
+  let label,o={foto};
+  if(S.expKind==='bahan'){
+    const g=ingById(S.expIng),q=dec(($('#exp-qty')||{}).value);if(!g){toast('Pilih bahan');return}if(q<=0){toast('Isi jumlah bahan yang dibeli');return}
+    const c=a/q;g.cost=newAvgCost(g,q,c);g.stock=Math.round((g.stock+q)*1000)/1000;
+    const note=$('#exp-note').value.trim();logIng(g.id,'restock',q,'Dibeli dari kas'+(note?': '+note:''),Math.round(c*100)/100);
+    label='Beli '+g.name+' ('+fq(q)+' '+g.unit+')'+(note?' · '+note:'');Object.assign(o,{kat:'bahan',iid:g.id,qty:q});
+  }else{
+    label=($('#fin-ket').value||'').trim();if(!label){toast('Isi keterangan, misalnya "Bayar parkir"');$('#fin-ket').focus();return}
+    o.kat='lain';
+  }
+  o.label=label;
+  const sh=curShift(),mv=sh?{id:uid(),ts:Date.now(),type:'out',amount:a,note:label}:null;if(mv){sh.moves.push(mv);o.ref=mv.id}
+  const r=cashOut(a,label,o);
+  save();closeModal();render();
+  toast((o.kat==='bahan'?'Stok bertambah. ':'')+'Diambil dari '+(r.dompet&&r.drawer?'Dompet '+rp(r.dompet)+' + Drawer '+rp(r.drawer):r.dompet?'Dompet':'Drawer')+(cashBal().drawer<0?'. Perhatian: saldo Drawer minus':''));
+};
+
 /* ========== halaman Keuangan ========== */
 function fotoFieldHTML(){
   const up=SG.mode==='local'&&syncOn();
@@ -1223,7 +1272,7 @@ VIEWS.finance=function(){
   sorted.forEach(e=>{if(run[e.akun]===undefined)return;run[e.akun]+=(e.jenis==='debit'?1:-1)*e.jumlah;saldo[e.id]=run[e.akun]});
   const [a,z]=finRange(F.range),rows=sorted.filter(e=>e.ts>=a&&e.ts<z&&(F.akun==='all'||e.akun===F.akun)).reverse();
   const sum=(ak,j)=>rows.filter(e=>e.akun===ak&&e.jenis===j).reduce((t,e)=>t+e.jumlah,0);
-  const tr=rows.slice(0,300).map(e=>{const u=userById(e.userId);return '<tr><td><b>'+fmtDate(e.ts)+'</b><div class="sub">'+fmtTime(e.ts)+(u?' · '+esc(u.name):'')+'</div></td><td><span class="pill '+(e.akun==='drawer'?'amber':'')+'">'+AKUN[e.akun]+'</span></td><td class="r num" style="color:var(--ok)">'+(e.jenis==='debit'?rp(e.jumlah):'')+'</td><td class="r num" style="color:var(--bad)">'+(e.jenis==='kredit'?rp(e.jumlah):'')+'</td><td>'+esc(e.ket)+(e.auto?' <span class="pill">otomatis</span>':'')+'</td><td>'+(e.foto?'<a class="btn sm ghost" href="'+esc(fotoHref(e.foto))+'" target="_blank" rel="noopener">Lihat</a>':'<span class="muted">-</span>')+'</td><td class="r num"><b>'+rp(saldo[e.id])+'</b></td></tr>'}).join('');
+  const tr=rows.slice(0,300).map(e=>{const u=userById(e.userId);return '<tr><td><b>'+fmtDate(e.ts)+'</b><div class="sub">'+fmtTime(e.ts)+(u?' · '+esc(u.name):'')+'</div></td><td><span class="pill '+(e.akun==='drawer'?'amber':'')+'">'+AKUN[e.akun]+'</span></td><td class="r num" style="color:var(--ok)">'+(e.jenis==='debit'?rp(e.jumlah):'')+'</td><td class="r num" style="color:var(--bad)">'+(e.jenis==='kredit'?rp(e.jumlah):'')+'</td><td>'+esc(e.ket)+(e.auto?' <span class="pill">otomatis</span>':'')+(e.kat==='bahan'?' <span class="pill ok">bahan baku</span>':'')+'</td><td>'+(e.foto?'<a class="btn sm ghost" href="'+esc(fotoHref(e.foto))+'" target="_blank" rel="noopener">Lihat</a>':'<span class="muted">-</span>')+'</td><td class="r num"><b>'+rp(saldo[e.id])+'</b></td></tr>'}).join('');
   const ranges=[['today','Hari ini'],['yesterday','Kemarin'],['7d','7 hari'],['month','Bulan ini'],['all','Semua']];
   const sh=curShift(),shifts=db.shifts.filter(x=>x.closeTs).sort((p,q)=>q.closeTs-p.closeTs).slice(0,6);
   const recRows=(sh?[sh]:[]).concat(shifts).map(x=>{const u=userById(x.userId),st=shiftStats(x);return '<div class="list-row"><div class="l"><b>'+fmtDate(x.openTs)+' · '+fmtTime(x.openTs)+' – '+(x.closeTs?fmtTime(x.closeTs):'berjalan')+'</b><span class="muted">'+esc(u?u.name:'-')+' · penjualan '+rp(st.total)+'</span></div><button class="btn sm ghost" data-act="shift-recap" data-id="'+x.id+'">Rekap</button></div>'}).join('');
@@ -1233,14 +1282,23 @@ VIEWS.finance=function(){
    +'<div class="card flush"><div class="card-h" style="padding:16px 18px 0;flex-wrap:wrap;gap:10px"><h3>Jurnal kas tunai</h3><div class="chips">'+ranges.map(r=>chip('fin-range',r[0],r[1],F.range)).join('')+'</div><select class="sel" data-ch="fin-akun" aria-label="Filter kas" style="width:auto;flex:0 0 auto"><option value="all"'+(F.akun==='all'?' selected':'')+'>Drawer & Dompet</option><option value="drawer"'+(F.akun==='drawer'?' selected':'')+'>Drawer</option><option value="dompet"'+(F.akun==='dompet'?' selected':'')+'>Dompet</option></select><button class="btn sm ghost" data-act="fin-csv">'+ico('copy')+'Salin CSV</button></div>'
    +'<p class="muted" style="padding:6px 18px 0;margin:0;font-size:12px">Periode ini: Drawer +'+rp(sum('drawer','debit'))+' / −'+rp(sum('drawer','kredit'))+' · Dompet +'+rp(sum('dompet','debit'))+' / −'+rp(sum('dompet','kredit'))+'</p>'
    +(tr?'<div class="tablewrap"><table style="min-width:860px"><thead><tr><th>Tanggal</th><th>Kas</th><th class="r">Debit (masuk)</th><th class="r">Kredit (keluar)</th><th>Keterangan</th><th>Foto struk</th><th class="r">Saldo</th></tr></thead><tbody>'+tr+'</tbody></table></div>':'<p class="muted" style="padding:18px">Belum ada catatan kas pada periode ini.</p>')+'</div>'
+   +expBreakdownHTML(a,z)
    +'<div class="card"><div class="card-h"><h3>Rekap penjualan per shift</h3><span class="muted">Siap cetak & kirim WhatsApp</span></div>'+(recRows||'<p class="muted">Belum ada shift.</p>')+'</div>';
 };
+function expBreakdownHTML(a,z){
+  const ex=(db.cashLog||[]).filter(e=>e.jenis==='kredit'&&e.kat&&e.ts>=a&&e.ts<z),g={};
+  ex.forEach(e=>{const k=e.kat==='bahan'?(ingById(e.iid)||{name:'Bahan'}).name:(e.label||e.ket);const key=e.kat+'|'+k.toLowerCase();const r=g[key]||(g[key]={kat:e.kat,name:k,v:0,n:new Set()});r.v+=e.jumlah;r.n.add(e.grp||e.id)});
+  const rows=Object.values(g).sort((x,y)=>y.v-x.v);if(!rows.length)return '';
+  const tot=k=>rows.filter(r=>r.kat===k).reduce((t,r)=>t+r.v,0);
+  return '<div class="card"><div class="card-h"><h3>Rincian pengeluaran</h3><span class="muted">Bahan baku '+rp(tot('bahan'))+' · Lainnya '+rp(tot('lain'))+'</span></div>'
+   +rows.map(r=>'<div class="list-row"><div class="l"><b>'+esc(r.name)+'</b><span class="muted">'+(r.kat==='bahan'?'Bahan baku':'Lainnya')+' · '+r.n.size+'×</span></div><b class="num">'+rp(r.v)+'</b></div>').join('')+'</div>';
+}
 ACT['fin-range']=el=>{S.fin.range=el.dataset.v;render()};
 CH['fin-akun']=el=>{S.fin.akun=el.value;render()};
 function finForm(title,body,act){modal({title,body:'<div class="form">'+body+'</div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="'+act+'">Simpan</button>'})}
 const amtFld=(id,l,v)=>'<div class="fld"><label class="lbl" for="'+id+'">'+l+'</label><input class="in" id="'+id+'" inputmode="numeric" value="'+(v!=null?v:'')+'" placeholder="0"></div>';
 const ketFld=ph=>'<div class="fld"><label class="lbl" for="fin-ket">Keterangan</label><input class="in" id="fin-ket" placeholder="'+esc(ph)+'"></div>';
-ACT['fin-out']=()=>finForm('Catat pengeluaran',amtFld('fin-amt','Jumlah')+ketFld('Contoh: Beli susu 2 liter')+fotoFieldHTML()+'<p class="muted" style="margin:0">Diambil dari Dompet (saldo '+rp(Math.max(0,cashBal().dompet))+'). Bila Dompet kurang, sisanya dari Drawer.'+(curShift()?' Tercatat juga sebagai kas keluar shift berjalan.':'')+'</p>','fin-out-go');
+ACT['fin-out']=()=>expOpen();
 ACT['fin-in']=()=>finForm('Catat pemasukan',amtFld('fin-amt','Jumlah')+ketFld('Contoh: Tambah modal kembalian')+fotoFieldHTML()+'<p class="muted" style="margin:0">Masuk ke Drawer. Bila Drawer melebihi '+rp(drawerLimit())+', kelebihannya otomatis ke Dompet.</p>','fin-in-go');
 function finSave(type){
   const a=num($('#fin-amt').value);if(a<=0){toast('Isi jumlah lebih dari 0');return}
@@ -1970,7 +2028,7 @@ ACT['open-shift']=()=>{
   save();render();toast('Shift dibuka');
 };
 ACT['cash-in']=()=>cashMove('in');
-ACT['cash-out']=()=>cashMove('out');
+ACT['cash-out']=()=>expOpen();
 ACT['cash-save']=el=>{
   const a=num($('#cm-amt').value);if(a<=0){toast('Isi jumlah lebih dari 0');return}
   const note=$('#cm-note').value.trim(),foto=fotoVal();if(foto===false)return;
