@@ -94,7 +94,7 @@ body.dev-on{padding-right:400px}body.dev-on .pos.pop .cart{right:416px}
 .dv-sw{display:flex;gap:10px;align-items:flex-start;cursor:pointer;padding:4px 0}.dv-sw input{width:18px;height:18px;margin-top:2px;accent-color:var(--amber)}.dv-sw b{display:block;font-size:13px;font-weight:600}.dv-sw small{display:block;font-size:11.5px;color:var(--muted)}
 .dv-li{display:grid;grid-template-columns:auto minmax(0,1fr);gap:8px;align-items:center}.dv-li input[type=checkbox]{width:18px;height:18px;accent-color:var(--amber)}.dv-li .in{min-height:34px;padding:6px 9px;font-size:13px}
 body.no-hpp .hpp,body.no-hpp .rc-row .rc-c,body.no-hpp .fld:has(#rs-cost),body.no-hpp #rs-avg,body.no-hpp .fld:has(#if-cost),body.no-hpp .rc:has(#if-pp){display:none!important}
-.dv-seg{width:100%}.imp-sum{font-size:13px;margin:4px 0 8px}.imp-g{margin-top:8px}.imp-r{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line)}.imp-r.ada{opacity:.5}.imp-n{min-width:0}.imp-n b{display:block;font-size:13.5px}.imp-n small{color:var(--muted);font-size:11.5px}#imp-prev{max-height:46vh;overflow:auto}.dv-pg{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px dashed var(--line)}.dv-pn{font-size:13px;font-weight:600;min-width:0}.dv-pn small{color:var(--muted);font-weight:400}.dv-li3{grid-template-columns:auto minmax(0,1fr) auto}.dv-reset{padding:14px 2px 0}
+.dv-seg{width:100%}.dr-bar{display:flex;gap:10px 14px;align-items:flex-end;flex-wrap:wrap;margin:-4px 0 12px}.dr{display:flex;gap:8px;flex-wrap:wrap}.dr-f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);font-weight:600}.dr-f .in{min-height:40px;padding:6px 10px;width:auto}.sv-top{margin-bottom:8px}.sv-seg{width:auto;min-width:230px}.s-isi{max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.imp-sum{font-size:13px;margin:4px 0 8px}.imp-g{margin-top:8px}.imp-r{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line)}.imp-r.ada{opacity:.5}.imp-n{min-width:0}.imp-n b{display:block;font-size:13.5px}.imp-n small{color:var(--muted);font-size:11.5px}#imp-prev{max-height:46vh;overflow:auto}.dv-pg{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px dashed var(--line)}.dv-pn{font-size:13px;font-weight:600;min-width:0}.dv-pn small{color:var(--muted);font-weight:400}.dv-li3{grid-template-columns:auto minmax(0,1fr) auto}.dv-reset{padding:14px 2px 0}
 .dv-foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}.dv-foot .btn:disabled{opacity:.45}
 @media (max-width:999px){body.dev-on{padding-right:0}#devbar{width:auto;left:0;top:auto;height:62dvh;border-left:0;border-top:1px solid var(--line);border-radius:18px 18px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.2)}body.dev-on .content{padding-bottom:calc(62dvh + 16px)}}
 .ak-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px 14px}.ak-grid .chk{font-weight:500}@media (max-width:420px){.ak-grid{grid-template-columns:1fr}}
@@ -760,7 +760,7 @@ function applyConfig(c){
   let st=document.getElementById('cfg-css');if(!st){st=document.createElement('style');st.id='cfg-css';document.head.appendChild(st)}
   st.textContent=css;
   if(!UI.types.includes(S.pos.type))S.pos.type=UI.types[0];
-  S.sf.range=UI.salesRange;S.rr=UI.reportRange;if(!UI.mtabs.includes(S.mt)||UI.mtabs[0]!==mtFirst)S.mt=UI.mtabs[0];mtFirst=UI.mtabs[0];
+  if(S._sr0!==UI.salesRange){S.sf.range=UI.salesRange;S._sr0=UI.salesRange}if(S._rr0!==UI.reportRange){S.rr=UI.reportRange;S._rr0=UI.reportRange}if(!UI.mtabs.includes(S.mt)||UI.mtabs[0]!==mtFirst)S.mt=UI.mtabs[0];mtFirst=UI.mtabs[0];
   if(S.user&&!canView(S.view))S.view=firstView();
 }
 /* pengaturan dasar (soan-config.json dari GitHub) + tumpukan dari Bilah Developer (db.settings.ui, ikut sinkron) */
@@ -1021,8 +1021,10 @@ function showReceipt(s,fresh){
 }
 
 /* ========== transaksi ========== */
-function rangeBounds(k){
+const isoTs=v=>{const m=/^(\d{4})-(\d{2})-(\d{2})$/.exec(v||'');return m?new Date(+m[1],+m[2]-1,+m[3]).getTime():null};
+function rangeBounds(k,from,to){
   const t0=sod(Date.now());
+  if(k==='custom'){let a=isoTs(from),b=isoTs(to);if(a==null&&b==null)return[t0,addDays(t0,1)];if(a==null)a=b;if(b==null)b=a;if(a>b){const x=a;a=b;b=x}return[a,addDays(b,1)]}
   switch(k){
     case 'today':return[t0,addDays(t0,1)];
     case 'yesterday':return[addDays(t0,-1),t0];
@@ -1033,29 +1035,48 @@ function rangeBounds(k){
   }
 }
 function filteredSales(){
-  const f=S.sf,[a,b]=rangeBounds(f.range),q=f.q.trim().toLowerCase();
+  const f=S.sf,[a,b]=rangeBounds(f.range,f.from,f.to),q=f.q.trim().toLowerCase();
   return db.sales.filter(s=>{
     if(s.ts<a||s.ts>=b)return false;
     if(f.status!=='all'&&s.status!==f.status)return false;
     if(f.method!=='all'&&s.method!==f.method)return false;
-    if(q){const cu=s.customerId?custById(s.customerId):null;if(!(s.no.toLowerCase().includes(q)||(cu&&cu.name.toLowerCase().includes(q))))return false}
+    if(q){const cu=s.customerId?custById(s.customerId):null;if(!(s.no.toLowerCase().includes(q)||(cu&&cu.name.toLowerCase().includes(q))||(s.items||[]).some(i=>String(i.name).toLowerCase().includes(q))))return false}
     return true;
   }).sort((x,y)=>y.ts-x.ts);
 }
+const SCOLS=[['waktu','Tanggal & jam',1],['pelanggan','Pelanggan',1],['tipe','Tipe pesanan',1],['kasir','Kasir',0],['isi','Isi pesanan',0],['metode','Metode',1],['diskon','Diskon',0],['status','Status',1]];
+const SCOL_KEY='soankofe.pos.salecols';
+function scols(){let o=null;try{o=JSON.parse(lsGet(SCOL_KEY)||'null')}catch(e){}const r={};SCOLS.forEach(c=>r[c[0]]=o&&typeof o[c[0]]==='boolean'?o[c[0]]:!!c[2]);return r}
+function salesMenuHTML(list){
+  const paid=list.filter(s=>s.status==='paid'),m={},q=S.sf.q.trim().toLowerCase();
+  paid.forEach(s=>s.items.forEach(i=>{const k=i.name,x=m[k]||(m[k]={name:k,pid:i.pid,q:0,v:0,n:new Set()});x.q+=i.qty;x.v+=i.price*i.qty;x.n.add(s.id)}));
+  let rows=Object.values(m);if(q)rows=rows.filter(x=>x.name.toLowerCase().includes(q));rows.sort((a,b)=>b.q-a.q||b.v-a.v);
+  if(!rows.length)return empty('Belum ada menu terjual','Ubah rentang tanggal atau kata kunci.');
+  const tq=rows.reduce((a,x)=>a+x.q,0),tv=rows.reduce((a,x)=>a+x.v,0);
+  return '<div class="sumbar"><span><b>'+rows.length+'</b> menu</span><span><b>'+tq+'</b> terjual</span><span>Total <b>'+rp(tv)+'</b> (sebelum pajak & diskon)</span></div><div class="tablewrap"><table><thead><tr><th>Menu</th><th>Kategori</th><th class="r">Terjual</th><th class="r">Struk</th><th class="r">Total</th></tr></thead><tbody>'
+   +rows.map(x=>{const pr=prodById(x.pid);return '<tr data-act="sm-open" data-v="'+esc(x.name)+'"><td><b>'+esc(x.name)+'</b></td><td>'+esc(pr?catName(pr.cat):'-')+'</td><td class="r"><b>'+x.q+'</b></td><td class="r">'+x.n.size+'</td><td class="r"><b>'+rp(x.v)+'</b></td></tr>'}).join('')+'</tbody></table></div>';
+}
 function salesListHTML(){
+  if(S.sf.view==='menu')return salesMenuHTML(filteredSales());
   const list=filteredSales();
   if(!list.length)return empty('Belum ada transaksi','Ubah filter tanggal atau mulai berjualan di menu Kasir.');
-  const paid=list.filter(s=>s.status==='paid'),sum=paid.reduce((a,s)=>a+s.total,0),shown=list.slice(0,150);
+  const paid=list.filter(s=>s.status==='paid'),sum=paid.reduce((a,s)=>a+s.total,0),shown=list.slice(0,150),C0=scols();
   const rows=shown.map(s=>{
     const cu=s.customerId?custById(s.customerId):null;
-    return '<tr data-act="sale-open" data-id="'+s.id+'"><td><b>'+esc(s.no)+'</b>'+(s.manual?' <span class="pill">rekap manual</span>':'')+'<div class="sub">'+fmtDT(s.ts)+'</div></td><td>'+(cu?esc(cu.name):'<span class="muted">Umum</span>')+'<div class="sub">'+TYPES[s.type]+(s.table?' · Meja '+esc(s.table):'')+'</div></td><td><span class="pill">'+METHODS[s.method]+'</span></td><td class="r"><b>'+rp(s.total)+'</b></td><td>'+(s.status==='void'?'<span class="pill bad">Dibatalkan</span>':'<span class="pill ok">Lunas</span>')+'</td></tr>';
+    const C=scols(),u=userById(s.userId),isi=s.items.map(i=>i.qty+'× '+i.name).join(', ');
+    return '<tr data-act="sale-open" data-id="'+s.id+'"><td><b>'+esc(s.no)+'</b>'+(s.manual?' <span class="pill">rekap manual</span>':'')+(C.waktu?'<div class="sub">'+fmtDT(s.ts)+'</div>':'')+'</td>'
+     +(C.pelanggan||C.tipe?'<td>'+(C.pelanggan?(cu?esc(cu.name):'<span class="muted">Umum</span>'):'')+(C.tipe?(C.pelanggan?'<div class="sub">':'<div>')+TYPES[s.type]+(s.table?' · Meja '+esc(s.table):'')+'</div>':'')+'</td>':'')
+     +(C.kasir?'<td>'+esc(u?u.name:'-')+'</td>':'')+(C.isi?'<td class="s-isi" title="'+esc(isi)+'">'+esc(isi)+'</td>':'')
+     +(C.metode?'<td><span class="pill">'+METHODS[s.method]+'</span></td>':'')+(C.diskon?'<td class="r">'+(s.discount?'−'+rp(s.discount):'<span class="muted">-</span>')+'</td>':'')+'<td class="r"><b>'+rp(s.total)+'</b></td>'+(C.status?'<td>'+(s.status==='void'?'<span class="pill bad">Dibatalkan</span>':'<span class="pill ok">Lunas</span>')+'</td>':'')+'</tr>';
   }).join('');
-  return '<div class="sumbar"><span><b>'+list.length+'</b> transaksi</span><span>Penjualan <b>'+rp(sum)+'</b></span>'+(list.length>shown.length?'<span>Menampilkan 150 terbaru</span>':'')+'</div><div class="tablewrap"><table><thead><tr><th>Struk</th><th>Pelanggan</th><th>Metode</th><th class="r">Total</th><th>Status</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
+  return '<div class="sumbar"><span><b>'+list.length+'</b> transaksi</span><span>Penjualan <b>'+rp(sum)+'</b></span>'+(list.length>shown.length?'<span>Menampilkan 150 terbaru</span>':'')+'</div><div class="tablewrap"><table><thead><tr><th>Struk</th>'+(C0.pelanggan||C0.tipe?'<th>'+(C0.pelanggan?'Pelanggan':'Tipe')+'</th>':'')+(C0.kasir?'<th>Kasir</th>':'')+(C0.isi?'<th>Isi pesanan</th>':'')+(C0.metode?'<th>Metode</th>':'')+(C0.diskon?'<th class="r">Diskon</th>':'')+'<th class="r">Total</th>'+(C0.status?'<th>Status</th>':'')+'</tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
 VIEWS.sales=function(){
   const f=S.sf;
   const opt=(o,cur)=>Object.keys(o).map(k=>'<option value="'+k+'"'+(k===cur?' selected':'')+'>'+o[k]+'</option>').join('');
-  return '<div class="toolbar">'+(partOn('sales','rentang')?'<div class="chips">'+[['today','Hari ini'],['yesterday','Kemarin'],['7d','7 hari'],['all','Semua']].map(r=>chip('sf-range',r[0],r[1],f.range)).join('')+'</div>':'<span></span>')+'<div class="toolbar-r">'+(partOn('sales','status')?'<select class="sel" data-ch="sf-status" aria-label="Status"><option value="all">Semua status</option><option value="paid"'+(f.status==='paid'?' selected':'')+'>Lunas</option><option value="void"'+(f.status==='void'?' selected':'')+'>Dibatalkan</option></select>':'')+(partOn('sales','metode')?'<select class="sel" data-ch="sf-method" aria-label="Metode"><option value="all">Semua metode</option>'+opt(METHODS,f.method)+'</select>':'')+(partOn('sales','cari')?'<input class="in search" data-in="sq" placeholder="Cari no. struk / pelanggan" value="'+esc(f.q)+'" aria-label="Cari transaksi">':'')+'</div></div><div class="card flush" id="slist">'+salesListHTML()+'</div>';
+  const [ra,rb]=rangeBounds(f.range,f.from,f.to);
+  const view='<div class="seg sv-seg" role="group" aria-label="Tampilan"><button class="'+(f.view!=='menu'?'on':'')+'" data-act="sf-view" data-v="struk">Per struk</button><button class="'+(f.view==='menu'?'on':'')+'" data-act="sf-view" data-v="menu">Per menu</button></div>';
+  return '<div class="toolbar sv-top">'+view+(f.view!=='menu'?'<button class="btn sm ghost" data-act="sf-cols">Kolom</button>':'')+'</div>'+'<div class="toolbar">'+(partOn('sales','rentang')?'<div class="chips">'+[['today','Hari ini'],['yesterday','Kemarin'],['7d','7 hari'],['all','Semua'],['custom','Pilih tanggal']].map(r=>chip('sf-range',r[0],r[1],f.range)).join('')+'</div>':'<span></span>')+'<div class="toolbar-r">'+(partOn('sales','status')?'<select class="sel" data-ch="sf-status" aria-label="Status"><option value="all">Semua status</option><option value="paid"'+(f.status==='paid'?' selected':'')+'>Lunas</option><option value="void"'+(f.status==='void'?' selected':'')+'>Dibatalkan</option></select>':'')+(partOn('sales','metode')?'<select class="sel" data-ch="sf-method" aria-label="Metode"><option value="all">Semua metode</option>'+opt(METHODS,f.method)+'</select>':'')+(partOn('sales','cari')?'<input class="in search" data-in="sq" placeholder="Cari struk, pelanggan, atau menu" value="'+esc(f.q)+'" aria-label="Cari transaksi">':'')+'</div></div>'+(f.range==='custom'&&partOn('sales','rentang')?'<div class="dr-bar">'+dateRangeHTML('sf',f.from,f.to)+'<span class="muted">'+rangeLabel(ra,rb)+'</span></div>':'')+'<div class="card flush" id="slist">'+salesListHTML()+'</div>';
 };
 function voidAsk(id){
   const s=db.sales.find(x=>x.id===id);if(!s)return;
@@ -1140,10 +1161,12 @@ function agg(list){
 }
 const deltaHTML=(c,p)=>{if(!p)return '<span class="delta muted">—</span>';const d=(c-p)/p*100;return '<span class="delta '+(d>=0?'up':'down')+'">'+(d>=0?'▲ ':'▼ ')+Math.abs(d).toFixed(0)+'% vs periode lalu</span>'};
 function reportData(){
-  const[a,b]=rangeBounds(S.rr),len=b-a,pa=a-len;
+  const[a,b]=rangeBounds(S.rr,S.rrFrom,S.rrTo),len=b-a,pa=a-len;
   const paid=db.sales.filter(s=>s.status==='paid');
   return{a,b,cur:paid.filter(s=>s.ts>=a&&s.ts<b),prev:paid.filter(s=>s.ts>=pa&&s.ts<a)};
 }
+function dateRangeHTML(pre,from,to){return '<div class="dr"><label class="dr-f"><span>Dari</span><input type="date" class="in" id="'+pre+'-from" data-ch="'+pre+'-date" value="'+esc(from||'')+'"></label><label class="dr-f"><span>Sampai</span><input type="date" class="in" id="'+pre+'-to" data-ch="'+pre+'-date" value="'+esc(to||'')+'"></label></div>'}
+function rangeLabel(a,b){const e=addDays(b,-1);return fmtDate(a)+(e>a?' – '+fmtDate(e):'')}
 function reportCards(m){
   const ids=UI.reports.filter(id=>m[id]);let out='',half=[];
   const flush=()=>{if(half.length)out+='<div class="grid-2">'+half.join('')+'</div>';half=[]};
@@ -1154,7 +1177,8 @@ VIEWS.reports=function(){
   const R=reportData(),c=agg(R.cur),p=agg(R.prev);
   const voids=db.sales.filter(s=>s.status==='void'&&s.ts>=R.a&&s.ts<R.b).length;
   let series=[];
-  if(S.rr==='today'){for(let h=7;h<=22;h++)series.push({label:pad(h),v:R.cur.filter(s=>new Date(s.ts).getHours()===h).reduce((x,s)=>x+s.total,0)})}
+  const oneDay=R.b-R.a<=86400e3+3600e3;
+  if(oneDay){for(let h=7;h<=22;h++)series.push({label:pad(h),v:R.cur.filter(s=>new Date(s.ts).getHours()===h).reduce((x,s)=>x+s.total,0)})}
   else{for(let t=R.a;t<R.b;t=addDays(t,1)){const e=addDays(t,1),d=new Date(t);series.push({label:pad(d.getDate())+'/'+pad(d.getMonth()+1),v:R.cur.filter(s=>s.ts>=t&&s.ts<e).reduce((x,s)=>x+s.total,0)})}}
   const hours=[];for(let h=7;h<=22;h++)hours.push({label:pad(h),v:R.cur.filter(s=>new Date(s.ts).getHours()===h).reduce((x,s)=>x+s.total,0)});
   const prodM={},catM={},payM={},useM={};
@@ -1167,12 +1191,12 @@ VIEWS.reports=function(){
   const useRows=Object.keys(useM).map(id=>{const g=ingById(id);return g?{name:g.name,v:useM[id]*g.cost,q:useM[id],u:g.unit}:null}).filter(Boolean).sort((x,y)=>y.v-x.v).slice(0,8);
   const gpRows=Object.values(prodM).map(x=>({name:x.name,v:Math.max(0,x.g),g:x.g,q:x.q})).sort((x,y)=>y.g-x.g).slice(0,8);
   const payHTML=pays.length?'<div class="stack" role="img" aria-label="Komposisi metode bayar">'+pays.map(m=>'<span class="c-'+m.k+'" style="width:'+(m.v/tot*100).toFixed(1)+'%"></span>').join('')+'</div>'+pays.map(m=>'<div class="list-row"><span><i class="sw c-'+m.k+'"></i>'+METHODS[m.k]+' <span class="muted">· '+m.n+' transaksi</span></span><b class="num">'+rp(m.v)+' <span class="muted">('+Math.round(m.v/tot*100)+'%)</span></b></div>').join(''):'<p class="muted">Belum ada data pada periode ini.</p>';
-  const ranges=[['today','Hari ini'],['7d','7 hari'],['14d','14 hari'],['month','Bulan ini']];
-  const every=series.length>16?3:series.length>10?2:1;
-  return parts('reports',{bar:'<div class="toolbar"><div class="chips">'+ranges.map(r=>chip('rr',r[0],r[1],S.rr)).join('')+'</div><button class="btn ghost" data-act="csv">'+ico('copy')+'Salin CSV</button></div>',
+  const ranges=[['today','Hari ini'],['7d','7 hari'],['14d','14 hari'],['month','Bulan ini'],['custom','Pilih tanggal']];
+  const every=series.length>16?Math.ceil(series.length/12):series.length>10?2:1;
+  return parts('reports',{bar:'<div class="toolbar"><div class="chips">'+ranges.map(r=>chip('rr',r[0],r[1],S.rr)).join('')+'</div><button class="btn ghost" data-act="csv">'+ico('copy')+'Salin CSV</button></div>'+(S.rr==='custom'?'<div class="dr-bar">'+dateRangeHTML('rr',S.rrFrom,S.rrTo)+'<span class="muted">'+rangeLabel(R.a,R.b)+' · '+Math.round((R.b-R.a)/86400e3)+' hari</span></div>':''),
    kpi:'<div class="kpis"><div class="kpi hero"><span class="lbl">Penjualan</span><span class="v">'+rp(c.rev)+'</span>'+deltaHTML(c.rev,p.rev)+'</div><div class="kpi"><span class="lbl">Transaksi</span><span class="v">'+c.n+'</span>'+deltaHTML(c.n,p.n)+'</div><div class="kpi"><span class="lbl">Rata-rata / transaksi</span><span class="v">'+rp(c.avg)+'</span>'+deltaHTML(c.avg,p.avg)+'</div><div class="kpi hpp"><span class="lbl">Laba kotor</span><span class="v">'+rp(c.gp)+'</span>'+deltaHTML(c.gp,p.gp)+'</div></div>',
    kartu:reportCards({
-     trend:'<div class="card"><div class="card-h"><h3>'+(S.rr==='today'?'Penjualan per jam':'Penjualan per hari')+'</h3><span class="muted">'+(voids?voids+' transaksi dibatalkan, tidak dihitung':'Termasuk PPN')+'</span></div>'+barChart(series,{hlLast:S.rr!=='today',every,label:'Penjualan'})+'</div>',
+     trend:'<div class="card"><div class="card-h"><h3>'+(oneDay?'Penjualan per jam':'Penjualan per hari')+'</h3><span class="muted">'+(voids?voids+' transaksi dibatalkan, tidak dihitung':'Termasuk PPN')+'</span></div>'+barChart(series,{hlLast:!oneDay&&S.rr!=='custom',every,label:'Penjualan'})+'</div>',
      top:'<div class="card"><div class="card-h"><h3>Produk terlaris</h3></div>'+hbars(top,r=>r.q+' pcs · '+rp(r.v))+'</div>',
      cats:'<div class="card"><div class="card-h"><h3>Per kategori</h3></div>'+hbars(cats)+'</div>',
      gp:!hppOn()?'':'<div class="card"><div class="card-h"><h3>Laba kotor per menu</h3><span class="muted help">Sebelum diskon</span></div>'+hbars(gpRows,r=>rp(r.g))+'</div>',
@@ -2545,7 +2569,13 @@ ACT['pay-confirm']=()=>completeSale();
 ACT['copy-receipt']=el=>{const s=db.sales.find(x=>x.id===el.dataset.id);if(s)copyText(receiptText(s))};
 ACT['copy-ta']=el=>{const t=$('#'+el.dataset.id);if(!t)return;copyText(t.value);t.select()};
 /* transaksi */
-ACT['sf-range']=el=>{S.sf.range=el.dataset.v;render()};
+ACT['sf-range']=el=>{const v=el.dataset.v,f=S.sf;if(v==='custom'&&f.range!=='custom'){const [a,b]=rangeBounds(f.range==='all'?'7d':f.range);f.from=isoDate(new Date(a));f.to=isoDate(new Date(addDays(b,-1)))}f.range=v;render()};
+CH['sf-date']=()=>{const f=S.sf;f.from=$('#sf-from').value;f.to=$('#sf-to').value;if(f.from&&f.to&&f.from>f.to){const x=f.from;f.from=f.to;f.to=x}render()};
+ACT['sf-view']=el=>{S.sf.view=el.dataset.v;render()};
+ACT['sm-open']=el=>{S.sf.view='struk';S.sf.q=el.dataset.v;render()};
+ACT['sf-cols']=()=>{const C=scols();modal({title:'Kolom yang tampil',body:'<div class="form">'+SCOLS.map(c=>'<label class="chk"><input type="checkbox" data-sc="'+c[0]+'"'+(C[c[0]]?' checked':'')+'>'+c[1]+'</label>').join('')+'</div>',foot:'<button class="btn ghost" data-act="sf-cols-reset">Bawaan</button><button class="btn primary" data-act="sf-cols-go">Terapkan</button>'})};
+ACT['sf-cols-go']=()=>{const o={};$$('[data-sc]').forEach(c=>o[c.dataset.sc]=c.checked);lsSet(SCOL_KEY,JSON.stringify(o));closeModal();render()};
+ACT['sf-cols-reset']=()=>{lsSet(SCOL_KEY,'');closeModal();render()};
 INP.sq=el=>{S.sf.q=el.value;$('#slist').innerHTML=salesListHTML()};
 CH['sf-status']=el=>{S.sf.status=el.value;$('#slist').innerHTML=salesListHTML()};
 CH['sf-method']=el=>{S.sf.method=el.value;$('#slist').innerHTML=salesListHTML()};
@@ -2579,7 +2609,8 @@ ACT['cust-save']=el=>{
 };
 ACT['cust-del']=el=>{const id=el.dataset.id;confirmBox('Hapus pelanggan','Data pelanggan dan poinnya dihapus. Transaksi lama tetap tersimpan.','Hapus',()=>{db.customers=db.customers.filter(c=>c.id!==id);if(S.pos.customerId===id)S.pos.customerId=null;save();render();toast('Pelanggan dihapus')})};
 /* laporan */
-ACT.rr=el=>{S.rr=el.dataset.v;render()};
+ACT.rr=el=>{const v=el.dataset.v;if(v==='custom'&&S.rr!=='custom'){const [a,b]=rangeBounds(S.rr);S.rrFrom=isoDate(new Date(a));S.rrTo=isoDate(new Date(addDays(b,-1)))}S.rr=v;render()};
+CH['rr-date']=()=>{S.rrFrom=$('#rr-from').value;S.rrTo=$('#rr-to').value;if(S.rrFrom&&S.rrTo&&S.rrFrom>S.rrTo){const x=S.rrFrom;S.rrFrom=S.rrTo;S.rrTo=x}render()};
 ACT.csv=()=>csvModal();
 /* pengaturan */
 ACT['save-settings']=()=>{
