@@ -182,7 +182,7 @@ const REPORTS={trend:'Grafik penjualan (per jam / per hari)',top:'Produk terlari
 const DEFAULT={versi:1,catatan:'Diatur dari Panel Developer (developer/). Boleh diedit manual; nilai yang tidak valid diabaikan.',
   tema:{aksen:'#F2A31B',aksenGelap:'#F5AE2E',sidebar:'#151412',latar:'#F6EFE6'},
   menu:[{id:'pos',label:'Kasir',tampil:true,kasir:true},{id:'sales',label:'Transaksi',tampil:true,kasir:true},{id:'menu',label:'Menu & Bahan',short:'Menu',tampil:true,kasir:false},{id:'reports',label:'Laporan',tampil:true,kasir:false},{id:'customers',label:'Pelanggan',tampil:true,kasir:true},{id:'shift',label:'Shift',tampil:true,kasir:true},{id:'finance',label:'Keuangan',tampil:true,kasir:false},{id:'inventory',label:'Inventory',tampil:true,kasir:false},{id:'settings',label:'Pengaturan',tampil:true,kasir:false}],
-  kasir:{keranjang:'popup',ukuranKartu:'normal',tipePesanan:Object.keys(TYPES).map(id=>({id,label:TYPES[id],tampil:true})),metodeBayar:Object.keys(METHODS).map(id=>({id,label:METHODS[id],tampil:true}))},
+  kasir:{keranjang:'samping',ukuranKartu:'normal',tipePesanan:Object.keys(TYPES).map(id=>({id,label:TYPES[id],tampil:true})),metodeBayar:Object.keys(METHODS).map(id=>({id,label:METHODS[id],tampil:true}))},
   laporan:Object.keys(REPORTS).map(id=>({id,tampil:true})),laporanRentang:'7d',
   transaksi:{filterAwal:'today'},menuBahan:{tab:Object.keys(MTABS).map(id=>({id,tampil:true}))},
   teks:{hashtag:'#monggosoan.',judulLogin:'Login to Access'}};
