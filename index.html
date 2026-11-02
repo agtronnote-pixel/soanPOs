@@ -99,6 +99,9 @@ body.no-hpp .hpp,body.no-hpp .rc-row .rc-c,body.no-hpp .fld:has(#rs-cost),body.n
 #thf-pop button{display:flex;width:100%;align-items:center;gap:8px;border:0;background:none;padding:9px 10px;border-radius:8px;font:500 13.5px var(--font-body);color:inherit;cursor:pointer;text-align:left}#thf-pop button:hover,#thf-pop button:focus-visible{background:var(--surface-2);outline:none}#thf-pop span{flex:1}#thf-pop small{color:var(--muted);font-size:12px}#thf-pop b{width:14px;text-align:right}
 .thf-m{display:none}.thf-m .thf{border:1px solid var(--line);border-radius:999px;padding:7px 12px;margin:0;font-size:13px;font-weight:600;background:var(--surface)}@media (max-width:640px){.thf-m{display:inline-flex}}
 .thf-reset{text-align:center;padding:0 0 18px}
+.saji-pick{display:grid;grid-template-columns:1fr 1fr;gap:12px}.saji-b{min-height:96px;border-radius:18px;border:1.5px solid var(--line);background:var(--surface-2);font:700 22px var(--font-display);color:var(--ink);cursor:pointer}.saji-b.saji-ice{background:#e6f2fb;color:#0f4c75;border-color:#bcdcf2}.saji-b.saji-hot{background:#fbeee4;color:#8a3b12;border-color:#f0cfb6}
+.saji-tg{border:0;border-radius:999px;padding:1px 8px;font:700 11px var(--font-body);cursor:pointer;vertical-align:middle;margin-left:4px;background:var(--surface-2);color:var(--ink)}.saji-tg.saji-ice{background:#e6f2fb;color:#0f4c75}.saji-tg.saji-hot{background:#fbeee4;color:#8a3b12}
+.saji-opt{display:flex;gap:18px;flex-wrap:wrap}.sj-box{border:1px solid var(--line);border-radius:14px;padding:12px;display:flex;flex-direction:column;gap:8px}.sj-h{display:flex;gap:10px;flex-wrap:wrap;align-items:center}.sj-lbl{width:110px;font-weight:700}.sj-seg{flex:1;min-width:240px}.sj-row{display:grid;grid-template-columns:minmax(0,1fr) 80px auto;gap:6px;align-items:center;margin-top:6px}
 .dv-seg{width:100%}.dr-bar{display:flex;gap:10px 14px;align-items:flex-end;flex-wrap:wrap;margin:-4px 0 12px}.dr{display:flex;gap:8px;flex-wrap:wrap}.dr-f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);font-weight:600}.dr-f .in{min-height:40px;padding:6px 10px;width:auto}.sv-top{margin-bottom:8px}.sv-seg{width:auto;min-width:230px}.s-isi{max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.imp-sum{font-size:13px;margin:4px 0 8px}.imp-g{margin-top:8px}.imp-r{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line)}.imp-r.ada{opacity:.5}.imp-n{min-width:0}.imp-n b{display:block;font-size:13.5px}.imp-n small{color:var(--muted);font-size:11.5px}#imp-prev{max-height:46vh;overflow:auto}.dv-pg{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px dashed var(--line)}.dv-pn{font-size:13px;font-weight:600;min-width:0}.dv-pn small{color:var(--muted);font-weight:400}.dv-li3{grid-template-columns:auto minmax(0,1fr) auto}.dv-reset{padding:14px 2px 0}
 .dv-foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}.dv-foot .btn:disabled{opacity:.45}
 @media (max-width:999px){body.dev-on{padding-right:0}#devbar{width:auto;left:0;top:auto;height:62dvh;border-left:0;border-top:1px solid var(--line);border-radius:18px 18px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.2)}body.dev-on .content{padding-bottom:calc(62dvh + 16px)}}
@@ -502,6 +505,7 @@ function migrate(d){
   if(d.settings.blockOut===undefined){d.settings.blockOut=true;ch=true}
   if(!Array.isArray(d.cashLog)){d.cashLog=[];ch=true}
   if(!Array.isArray(d.invoices)){d.invoices=[];ch=true}
+  if(!d.settings.sajian||typeof d.settings.sajian!=='object'){d.settings.sajian={ice:{label:'Ice',bawa:false,rec:[]},hot:{label:'Hot',bawa:true,rec:[]}};ch=true}
   if(d.settings.drawerLimit===undefined){d.settings.drawerLimit=200000;ch=true}
   if(!d.settings.wa||typeof d.settings.wa!=='object'){d.settings.wa=Object.assign({},WA_DEF);ch=true}
   if((d.v||1)<2){
@@ -908,7 +912,7 @@ function gridHTML(){
 function cartHTML(){
   const c=S.pos,T=totals(),n=cartCount(),st=db.settings;
   const cust=c.customerId?custById(c.customerId):null;
-  const items=c.cart.length?c.cart.map((i,ix)=>'<div class="ci"><div><div class="ci-name">'+esc(i.name)+'</div><div class="ci-sub">'+rp(i.price)+(i.note?' · <em>'+esc(i.note)+'</em>':'')+'</div></div><div class="ci-tot">'+rp(i.price*i.qty)+'</div><div class="ci-ctl"><button class="qbtn" data-act="qty" data-i="'+ix+'" data-d="-1" aria-label="Kurangi">−</button><span class="q">'+i.qty+'</span><button class="qbtn" data-act="qty" data-i="'+ix+'" data-d="1" aria-label="Tambah">+</button></div><div class="ci-act"><button class="icon-btn sm" data-act="note" data-i="'+ix+'" aria-label="Catatan">'+ico('note','')+'</button></div></div>').join(''):empty('Pesanan kosong','Ketuk menu di sebelah kiri untuk menambah item.');
+  const items=c.cart.length?c.cart.map((i,ix)=>'<div class="ci"><div><div class="ci-name">'+esc(i.saji?(i.base||i.name):i.name)+(i.saji?' <button class="saji-tg saji-'+i.saji+'" data-act="ci-saji" data-i="'+ix+'" aria-label="Ganti penyajian">'+esc(sajiLabel(i.saji))+(prodSaji(prodById(i.pid)).length>1?' ⇄':'')+'</button>':'')+'</div><div class="ci-sub">'+rp(i.price)+(i.note?' · <em>'+esc(i.note)+'</em>':'')+'</div></div><div class="ci-tot">'+rp(i.price*i.qty)+'</div><div class="ci-ctl"><button class="qbtn" data-act="qty" data-i="'+ix+'" data-d="-1" aria-label="Kurangi">−</button><span class="q">'+i.qty+'</span><button class="qbtn" data-act="qty" data-i="'+ix+'" data-d="1" aria-label="Tambah">+</button></div><div class="ci-act"><button class="icon-btn sm" data-act="note" data-i="'+ix+'" aria-label="Catatan">'+ico('note','')+'</button></div></div>').join(''):empty('Pesanan kosong','Ketuk menu di sebelah kiri untuk menambah item.');
   const seg=UI.types.map(k=>'<button class="'+(c.type===k?'on':'')+'" data-act="otype" data-v="'+k+'">'+TYPES[k]+'</button>').join('');
   const disc=T.discount?'<div class="sumr"><span>Diskon <button class="link" data-act="discount">ubah</button></span><span>−'+rp(T.discount)+'</span></div>':'<div class="sumr"><span>Diskon</span><button class="link" data-act="discount">Tambah diskon</button></div>';
   return '<div class="cart-head"><div><div class="lbl">Pesanan baru</div><h2>'+(n?n+' item':'Belum ada item')+'</h2></div><div class="cart-head-btns"><button class="btn sm ghost" data-act="held">'+ico('pause')+'Tersimpan'+(db.held.length?' <span class="badge">'+db.held.length+'</span>':'')+'</button><button class="icon-btn only-m" data-act="cart-close" aria-label="Tutup">'+ico('x')+'</button></div></div>'
@@ -981,7 +985,7 @@ function completeSale(){
   let paid=T.total,change=0;
   if(p.method==='cash'){paid=num(p.received);if(paid<T.total)return;change=paid-T.total}
   const ts=Date.now(),no=nextNo(ts);
-  const sale=Object.assign({id:uid(),no,ts,userId:S.user.id,customerId:S.pos.customerId,type:S.pos.type,table:S.pos.type==='dine'?S.pos.table:'',items:cart.map(i=>{const pr=prodById(i.pid),rc=pr&&modeOf(pr)==='recipe'?pr.recipe.map(r=>({iid:r.iid,qty:r.qty})):[];return{pid:i.pid,name:i.name,price:i.price,cost:pr?unitCost(pr):i.cost,qty:i.qty,note:i.note,rec:rc}}),discType:S.pos.disc.type,discValue:S.pos.disc.value,taxRate:st.taxEnabled?st.taxRate:0,serviceRate:st.serviceEnabled?st.serviceRate:0,method:p.method,ref:p.ref||'',paid,change,status:'paid',shiftId:curShift().id,points:0},T);
+  const sale=Object.assign({id:uid(),no,ts,userId:S.user.id,customerId:S.pos.customerId,type:S.pos.type,table:S.pos.type==='dine'?S.pos.table:'',items:cart.map(i=>{const pr=prodById(i.pid),rc=pr&&modeOf(pr)==='recipe'?pr.recipe.map(r=>({iid:r.iid,qty:r.qty})):[],ex=i.saji?sajiRec(i.saji,S.pos.type):[];ex.forEach(r=>rc.push(r));const exc=ex.reduce((a,r)=>{const g=ingById(r.iid);return a+(g?g.cost*r.qty:0)},0);const o={pid:i.pid,name:i.name,price:i.price,cost:(pr?unitCost(pr):i.cost)+exc,qty:i.qty,note:i.note,rec:rc};if(i.saji){o.saji=i.saji;o.base=i.base||i.name}return o}),discType:S.pos.disc.type,discValue:S.pos.disc.value,taxRate:st.taxEnabled?st.taxRate:0,serviceRate:st.serviceEnabled?st.serviceRate:0,method:p.method,ref:p.ref||'',paid,change,status:'paid',shiftId:curShift().id,points:0},T);
   cart.forEach(i=>{const pr=prodById(i.pid);if(pr&&modeOf(pr)==='stock'){pr.stock-=i.qty;logStock(pr.id,'sale',-i.qty,no)}});
   const use={};sale.items.forEach(i=>i.rec.forEach(r=>{use[r.iid]=(use[r.iid]||0)+r.qty*i.qty}));
   Object.keys(use).forEach(id=>{const g=ingById(id);if(g){g.stock=Math.round((g.stock-use[id])*1000)/1000;logIng(id,'sale',-use[id],no)}});
@@ -1054,12 +1058,12 @@ const SCOL_KEY='soankofe.pos.salecols';
 function scols(){let o=null;try{o=JSON.parse(lsGet(SCOL_KEY)||'null')}catch(e){}const r={};SCOLS.forEach(c=>r[c[0]]=o&&typeof o[c[0]]==='boolean'?o[c[0]]:!!c[2]);return r}
 function salesMenuHTML(list){
   const paid=list.filter(s=>s.status==='paid'),m={},q=S.sf.q.trim().toLowerCase();
-  paid.forEach(s=>s.items.forEach(i=>{const k=i.name,x=m[k]||(m[k]={name:k,pid:i.pid,q:0,v:0,n:new Set()});x.q+=i.qty;x.v+=i.price*i.qty;x.n.add(s.id)}));
+  paid.forEach(s=>s.items.forEach(i=>{const k=baseName(i),x=m[k]||(m[k]={name:k,pid:i.pid,q:0,v:0,n:new Set(),sj:{}});if(i.saji)x.sj[i.saji]=(x.sj[i.saji]||0)+i.qty;x.q+=i.qty;x.v+=i.price*i.qty;x.n.add(s.id)}));
   let rows=Object.values(m);if(q)rows=rows.filter(x=>x.name.toLowerCase().includes(q));const sc=S.sf.cat||'all';if(sc!=='all')rows=rows.filter(x=>{const pr=prodById(x.pid);return pr&&pr.cat===sc});rows.sort((a,b)=>b.q-a.q||b.v-a.v);
   if(!rows.length)return empty('Belum ada menu terjual','Ubah rentang tanggal, kata kunci, atau filter.')+thfReset('sf-freset',(S.sf.cat||'all')!=='all');
   const tq=rows.reduce((a,x)=>a+x.q,0),tv=rows.reduce((a,x)=>a+x.v,0);
   return '<div class="sumbar"><span><b>'+rows.length+'</b> menu</span><span><b>'+tq+'</b> terjual</span><span>Total <b>'+rp(tv)+'</b> (sebelum pajak & diskon)</span></div><div class="tablewrap"><table><thead><tr><th>Menu</th><th>'+thf('scat','Kategori')+'</th><th class="r">Terjual</th><th class="r">Struk</th><th class="r">Total</th></tr></thead><tbody>'
-   +rows.map(x=>{const pr=prodById(x.pid);return '<tr data-act="sm-open" data-v="'+esc(x.name)+'"><td><b>'+esc(x.name)+'</b></td><td>'+esc(pr?catName(pr.cat):'-')+'</td><td class="r"><b>'+x.q+'</b></td><td class="r">'+x.n.size+'</td><td class="r"><b>'+rp(x.v)+'</b></td></tr>'}).join('')+'</tbody></table></div>';
+   +rows.map(x=>{const pr=prodById(x.pid),sj=Object.keys(x.sj);return '<tr data-act="sm-open" data-v="'+esc(x.name)+'"><td><b>'+esc(x.name)+'</b>'+(sj.length?'<div class="sub">'+sj.map(k=>esc(sajiLabel(k))+' '+x.sj[k]).join(' · ')+'</div>':'')+'</td><td>'+esc(pr?catName(pr.cat):'-')+'</td><td class="r"><b>'+x.q+'</b></td><td class="r">'+x.n.size+'</td><td class="r"><b>'+rp(x.v)+'</b></td></tr>'}).join('')+'</tbody></table></div>';
 }
 function salesListHTML(){
   if(S.sf.view==='menu')return salesMenuHTML(filteredSales());
@@ -1203,7 +1207,7 @@ VIEWS.reports=function(){
   const hours=[];for(let h=7;h<=22;h++)hours.push({label:pad(h),v:R.cur.filter(s=>new Date(s.ts).getHours()===h).reduce((x,s)=>x+s.total,0)});
   const prodM={},catM={},payM={},useM={};
   R.cur.forEach(s=>{
-    s.items.forEach(i=>{const pm=prodM[i.name]||(prodM[i.name]={name:i.name,v:0,q:0,g:0});pm.v+=i.price*i.qty;pm.q+=i.qty;pm.g+=(i.price-i.cost)*i.qty;itemRec(i).forEach(r=>{useM[r.iid]=(useM[r.iid]||0)+r.qty*i.qty});const pr=prodById(i.pid),cn=pr?catName(pr.cat):'Lainnya';const cm=catM[cn]||(catM[cn]={name:cn,v:0});cm.v+=i.price*i.qty});
+    s.items.forEach(i=>{const bn=baseName(i),pm=prodM[bn]||(prodM[bn]={name:bn,v:0,q:0,g:0});pm.v+=i.price*i.qty;pm.q+=i.qty;pm.g+=(i.price-i.cost)*i.qty;itemRec(i).forEach(r=>{useM[r.iid]=(useM[r.iid]||0)+r.qty*i.qty});const pr=prodById(i.pid),cn=pr?catName(pr.cat):'Lainnya';const cm=catM[cn]||(catM[cn]={name:cn,v:0});cm.v+=i.price*i.qty});
     const m=payM[s.method]||(payM[s.method]={k:s.method,v:0,n:0});m.v+=s.total;m.n++;
   });
   const top=Object.values(prodM).sort((x,y)=>y.v-x.v).slice(0,8),cats=Object.values(catM).sort((x,y)=>y.v-x.v),pays=Object.values(payM).sort((x,y)=>y.v-x.v);
@@ -1280,7 +1284,7 @@ function rangeTxt(a,b){
 const rpRekap=v=>'Rp. '+String(Math.round(v||0)).replace(/\B(?=(\d{3})+(?!\d))/g,'.')+',-';
 function shiftRecap(sh){
   const x=shiftStats(sh),prod={},byM={};
-  x.ss.forEach(s=>{byM[s.method]=(byM[s.method]||0)+s.total;s.items.forEach(i=>{prod[i.name]=(prod[i.name]||0)+i.qty})});
+  x.ss.forEach(s=>{byM[s.method]=(byM[s.method]||0)+s.total;s.items.forEach(i=>{prod[baseName(i)]=(prod[baseName(i)]||0)+i.qty})});
   const items=Object.entries(prod).sort((a,b)=>b[1]-a[1]||a[0].localeCompare(b[0]));
   const nonCash=Object.keys(byM).filter(k=>k!=='cash').reduce((a,k)=>a+byM[k],0);
   const kas=sh.openCash+x.inn-x.out,sysTotal=x.total+kas,closed=!!sh.closeTs;
@@ -1848,9 +1852,16 @@ function logIng(iid,type,qty,note,unitCostV){
   db.ingLog.push({id:uid(),ts:Date.now(),iid,type,qty,note:note||'',unitCost:unitCostV==null?null:unitCostV,userId:S.user?S.user.id:null});
   if(db.ingLog.length>2500)db.ingLog.splice(0,db.ingLog.length-2000);
 }
+/* penyajian Ice / Hot: satu menu, bahan tambahan (cup, tutup, sedotan) terpotong sesuai pilihan */
+const SAJI_KEYS=['ice','hot'];
+const sajiCfg=()=>{const c=(db.settings&&db.settings.sajian)||{};return {ice:Object.assign({label:'Ice',bawa:false,rec:[]},c.ice||{}),hot:Object.assign({label:'Hot',bawa:true,rec:[]},c.hot||{})}};
+const sajiLabel=k=>(sajiCfg()[k]||{}).label||k;
+const prodSaji=p=>Array.isArray(p&&p.sajian)?p.sajian.filter(k=>SAJI_KEYS.includes(k)):[];
+function sajiRec(k,type){const c=sajiCfg()[k];if(!c)return [];if(c.bawa&&type==='dine')return [];return (c.rec||[]).filter(r=>r&&r.iid&&+r.qty>0&&ingById(r.iid)).map(r=>({iid:r.iid,qty:+r.qty}))}
+const baseName=i=>i.base||i.name;
 function cartUsage(cart){
   const m={};
-  cart.forEach(i=>{const p=prodById(i.pid);if(p&&modeOf(p)==='recipe')p.recipe.forEach(r=>{m[r.iid]=(m[r.iid]||0)+r.qty*i.qty})});
+  cart.forEach(i=>{const p=prodById(i.pid);if(p&&modeOf(p)==='recipe')p.recipe.forEach(r=>{m[r.iid]=(m[r.iid]||0)+r.qty*i.qty});if(i.saji)sajiRec(i.saji,S.pos.type).forEach(r=>{m[r.iid]=(m[r.iid]||0)+r.qty*i.qty})});
   return m;
 }
 /* sisa porsi yang masih bisa dijual; n=null berarti tidak dibatasi */
@@ -1903,7 +1914,7 @@ function productListHTML(){
     else if(a.n<=0)av='<span class="pill bad">Habis</span>'+sub;
     else if(md==='stock'?a.n<=p.min:a.n<=5)av='<span class="pill warn">'+a.n+'</span>'+sub;
     else av='<span class="num">'+a.n+'</span>';
-    return '<tr data-act="prod-edit" data-id="'+p.id+'"><td><b>'+esc(p.name)+'</b><div class="sub">'+esc(p.sku)+'</div></td><td>'+esc(catName(p.cat))+'</td><td class="hpp">'+src+'</td><td class="r">'+rp(p.price)+'</td><td class="r hpp">'+rp(unitCost(p))+'</td><td class="r hpp"><span class="pill '+(mg<40?'warn':'ok')+'">'+mg+'%</span></td><td>'+av+'</td><td>'+(p.active?'<span class="pill ok">Aktif</span>':'<span class="pill">Nonaktif</span>')+'</td></tr>';
+    return '<tr data-act="prod-edit" data-id="'+p.id+'"><td><b>'+esc(p.name)+'</b><div class="sub">'+esc(p.sku)+(prodSaji(p).length?' · '+prodSaji(p).map(sajiLabel).map(esc).join(' / '):'')+'</div></td><td>'+esc(catName(p.cat))+'</td><td class="hpp">'+src+'</td><td class="r">'+rp(p.price)+'</td><td class="r hpp">'+rp(unitCost(p))+'</td><td class="r hpp"><span class="pill '+(mg<40?'warn':'ok')+'">'+mg+'%</span></td><td>'+av+'</td><td>'+(p.active?'<span class="pill ok">Aktif</span>':'<span class="pill">Nonaktif</span>')+'</td></tr>';
   }).join('');
   return '<div class="tablewrap"><table style="min-width:860px"><thead><tr><th>Menu</th><th>'+thf('pcat','Kategori')+'</th><th class="hpp">Sumber HPP</th><th class="r">Harga</th><th class="r hpp">HPP</th><th class="r hpp">Margin</th><th>Tersedia</th><th>'+thf('pstat','Status')+'</th></tr></thead><tbody>'+rows+'</tbody></table></div>';
 }
@@ -1947,7 +1958,7 @@ function prodForm(id){
     :'<div class="rc" id="pf-recipe"'+(m==='recipe'?'':' hidden')+'><b>Belum ada bahan baku</b><p class="muted">Tambahkan bahan lebih dulu agar bisa dipakai di resep.</p><div><button type="button" class="btn sm dark" data-act="goto-ing">Tambah bahan baku</button></div></div>';
   const stockBox='<div class="fld-row" id="pf-stockbox"'+(m==='stock'?'':' hidden')+'><div class="fld"><label class="lbl" for="pf-stock">'+(id?'Stok saat ini':'Stok awal')+'</label><input class="in" id="pf-stock" inputmode="numeric" value="'+esc(p.stock||0)+'"'+(id?' disabled':'')+'>'+(id?'<button type="button" class="link" data-act="prod-adj" data-id="'+id+'">Sesuaikan stok</button>':'')+'</div><div class="fld"><label class="lbl" for="pf-min">Batas stok menipis</label><input class="in" id="pf-min" inputmode="numeric" value="'+esc(p.min)+'"></div></div>';
   const manual='<div class="fld hpp" id="pf-manual"'+(m!=='recipe'?'':' hidden')+'><label class="lbl" for="pf-cost">HPP (modal) per porsi</label><input class="in" id="pf-cost" inputmode="numeric" value="'+esc(p.cost)+'"></div>';
-  modal({title:id?'Ubah menu':'Menu baru',wide:true,body:'<div class="form"><div class="fld"><label class="lbl" for="pf-name">Nama menu</label><input class="in" id="pf-name" value="'+esc(p.name)+'"></div><div class="fld-row"><div class="fld"><label class="lbl" for="pf-sku">SKU</label><input class="in" id="pf-sku" value="'+esc(p.sku)+'" placeholder="Otomatis"></div><div class="fld"><label class="lbl" for="pf-cat">Kategori</label><select class="sel" id="pf-cat">'+cats+'</select></div></div><div class="fld"><label class="lbl" for="pf-price">Harga jual</label><input class="in" id="pf-price" data-in="pf-price" inputmode="numeric" value="'+esc(p.price)+'"></div><div class="fld"><span class="lbl">Sumber HPP dan stok</span><div class="seg" role="group" aria-label="Sumber HPP dan stok">'+seg+'</div></div>'+recipeBox+stockBox+manual+'<label class="chk"><input type="checkbox" id="pf-active"'+(p.active?' checked':'')+'>Tampilkan di kasir</label></div>',foot:(id?'<button class="btn danger" data-act="prod-del" data-id="'+id+'">Hapus</button>':'')+'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="prod-save" data-id="'+(id||'')+'">Simpan</button>'});
+  modal({title:id?'Ubah menu':'Menu baru',wide:true,body:'<div class="form"><div class="fld"><label class="lbl" for="pf-name">Nama menu</label><input class="in" id="pf-name" value="'+esc(p.name)+'"></div><div class="fld-row"><div class="fld"><label class="lbl" for="pf-sku">SKU</label><input class="in" id="pf-sku" value="'+esc(p.sku)+'" placeholder="Otomatis"></div><div class="fld"><label class="lbl" for="pf-cat">Kategori</label><select class="sel" id="pf-cat">'+cats+'</select></div></div><div class="fld"><label class="lbl" for="pf-price">Harga jual</label><input class="in" id="pf-price" data-in="pf-price" inputmode="numeric" value="'+esc(p.price)+'"></div><div class="fld"><span class="lbl">Sumber HPP dan stok</span><div class="seg" role="group" aria-label="Sumber HPP dan stok">'+seg+'</div></div>'+recipeBox+stockBox+manual+'<div class="fld"><span class="lbl">Pilihan penyajian</span><div class="saji-opt">'+SAJI_KEYS.map(k=>'<label class="chk"><input type="checkbox" data-pfsaji="'+k+'"'+(prodSaji(p).includes(k)?' checked':'')+'>'+esc(sajiLabel(k))+'</label>').join('')+'</div></div><label class="chk"><input type="checkbox" id="pf-active"'+(p.active?' checked':'')+'>Tampilkan di kasir</label></div>',foot:(id?'<button class="btn danger" data-act="prod-del" data-id="'+id+'">Hapus</button>':'')+'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="prod-save" data-id="'+(id||'')+'">Simpan</button>'});
   rcLive();
 }
 function prodSave(id){
@@ -1961,7 +1972,7 @@ function prodSave(id){
     recipe=Object.keys(m).map(k=>({iid:k,qty:m[k]}));
     if(!recipe.length){toast('Tambahkan minimal satu bahan beserta takarannya');return}
   }
-  const o={name,cat:$('#pf-cat').value,price,min:Math.max(0,num($('#pf-min').value)),active:$('#pf-active').checked,mode,recipe,track:mode==='stock'};
+  const o={sajian:SAJI_KEYS.filter(k=>{const c=$('[data-pfsaji="'+k+'"]');return c&&c.checked}),name,cat:$('#pf-cat').value,price,min:Math.max(0,num($('#pf-min').value)),active:$('#pf-active').checked,mode,recipe,track:mode==='stock'};
   o.cost=mode==='recipe'?recipeCost(recipe,db.ingredients):Math.max(0,num($('#pf-cost').value));
   let sku=$('#pf-sku').value.trim();
   if(id){const p=prodById(id);if(!sku)sku=p.sku;Object.assign(p,o,{sku})}
@@ -1973,6 +1984,19 @@ function prodSave(id){
   }
   save();closeModal();render();toast('Menu disimpan');
 }
+/* pengaturan bahan tambahan penyajian */
+function sajiRowsHTML(k){const c=S.sj[k];return c.rec.map((r,ix)=>'<div class="sj-row"><select class="sel" data-sjk="'+k+'" data-sji="'+ix+'" data-sjf="iid"><option value="">Pilih bahan</option>'+db.ingredients.slice().sort((a,b)=>a.name.localeCompare(b.name)).map(g=>'<option value="'+g.id+'"'+(g.id===r.iid?' selected':'')+'>'+esc(g.name)+' ('+esc(g.unit)+')</option>').join('')+'</select><input class="in" inputmode="decimal" data-sjk="'+k+'" data-sji="'+ix+'" data-sjf="qty" value="'+esc(r.qty)+'" aria-label="Jumlah"><button class="icon-btn" data-act="sj-del" data-k="'+k+'" data-i="'+ix+'" aria-label="Hapus">'+ico('trash')+'</button></div>').join('')||'<p class="muted" style="margin:4px 0">Belum ada bahan.</p>'}
+function sajiBody(){return SAJI_KEYS.map(k=>{const c=S.sj[k];return '<div class="sj-box"><div class="sj-h"><input class="in sj-lbl" data-sjk="'+k+'" data-sjf="label" value="'+esc(c.label)+'" maxlength="12" aria-label="Nama penyajian"><div class="seg sj-seg"><button class="'+(!c.bawa?'on':'')+'" data-act="sj-rule" data-k="'+k+'" data-v="0">Semua pesanan</button><button class="'+(c.bawa?'on':'')+'" data-act="sj-rule" data-k="'+k+'" data-v="1">Take away & delivery</button></div></div><div class="lbl">Bahan yang terpotong per porsi</div><div>'+sajiRowsHTML(k)+'</div><button class="btn sm ghost" data-act="sj-add" data-k="'+k+'">'+ico('plus')+'Tambah bahan</button></div>'}).join('')}
+function sajiSuggest(c){const f=rx=>db.ingredients.find(g=>rx.test(g.name));
+  if(!c.ice.rec.length){[f(/^cup\s*ice/i)||f(/cup.*(plastik|ice)/i),f(/sedotan\s*ice/i)].filter(Boolean).forEach(g=>c.ice.rec.push({iid:g.id,qty:1}))}
+  if(!c.hot.rec.length){[f(/^cup\s*hot/i)||f(/paper\s*cup/i),f(/tutup.*hot/i)].filter(Boolean).forEach(g=>c.hot.rec.push({iid:g.id,qty:1}))}}
+ACT['saji-set']=()=>{const c=JSON.parse(JSON.stringify(sajiCfg()));sajiSuggest(c);S.sj=c;modal({title:'Penyajian Ice / Hot',wide:true,body:'<div class="form" id="sj-body">'+sajiBody()+'</div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="sj-save">Simpan</button>'})};
+const sjRender=()=>{const b=$('#sj-body');if(b)b.innerHTML=sajiBody()};
+ACT['sj-rule']=el=>{S.sj[el.dataset.k].bawa=el.dataset.v==='1';sjRender()};
+ACT['sj-add']=el=>{S.sj[el.dataset.k].rec.push({iid:'',qty:1});sjRender()};
+ACT['sj-del']=el=>{S.sj[el.dataset.k].rec.splice(+el.dataset.i,1);sjRender()};
+document.addEventListener('change',e=>{const el=e.target.closest('[data-sjk]');if(!el||!S.sj)return;const c=S.sj[el.dataset.sjk];if(el.dataset.sjf==='label'){c.label=el.value.trim().slice(0,12)||(el.dataset.sjk==='ice'?'Ice':'Hot');return}const r=c.rec[+el.dataset.sji];if(!r)return;if(el.dataset.sjf==='iid')r.iid=el.value;else r.qty=dec(el.value)});
+ACT['sj-save']=()=>{const c=S.sj;SAJI_KEYS.forEach(k=>{c[k].rec=c[k].rec.filter(r=>r.iid&&ingById(r.iid)&&+r.qty>0).map(r=>({iid:r.iid,qty:+r.qty}))});db.settings.sajian=c;S.sj=null;save();closeModal();render();toast('Penyajian Ice / Hot disimpan')};
 function catManage(){
   const rows=db.categories.map(c=>{const n=db.products.filter(p=>p.cat===c.id).length;return '<div class="list-row"><div class="l"><input class="in" data-in="cat-rename" data-id="'+c.id+'" value="'+esc(c.name)+'" aria-label="Nama kategori"></div><span class="muted">'+n+' menu</span>'+(n?'':'<button class="icon-btn sm" data-act="cat-del" data-id="'+c.id+'" aria-label="Hapus">'+ico('trash')+'</button>')+'</div>'}).join('');
   modal({title:'Kategori',body:'<div>'+rows+'</div><div class="fld-row" style="grid-template-columns:1fr auto;align-items:end"><div class="fld"><label class="lbl" for="cat-new">Kategori baru</label><input class="in" id="cat-new" placeholder="Contoh: Dessert"></div><button class="btn primary" data-act="cat-add">Tambah</button></div>',foot:'<button class="btn dark" data-act="cat-done">Selesai</button>'});
@@ -2171,7 +2195,7 @@ function menuSumHTML(){
    +'<div class="card"><div class="card-h"><h3>Pemakaian bahan 7 hari</h3><span class="muted help hpp">Nilai HPP</span></div>'+hbars(useRows,r=>fq(r.q)+' '+r.u+(hppOn()?' · '+rp(r.v):''))+'</div></div>';
 }
 function menuTabHTML(){
-  return '<div class="toolbar"><div class="toolbar-r"><input class="in search" data-in="pq" placeholder="Cari menu atau SKU" value="'+esc(S.pq)+'" aria-label="Cari menu"></div><div class="toolbar-r"><button class="btn ghost" data-act="cat-manage">Kategori</button><button class="btn primary" data-act="prod-new">'+ico('plus')+'Menu baru</button></div></div><div class="card flush" id="plist">'+productListHTML()+'</div>';
+  return '<div class="toolbar"><div class="toolbar-r"><input class="in search" data-in="pq" placeholder="Cari menu atau SKU" value="'+esc(S.pq)+'" aria-label="Cari menu"></div><div class="toolbar-r"><button class="btn ghost" data-act="saji-set">Ice / Hot</button><button class="btn ghost" data-act="cat-manage">Kategori</button><button class="btn primary" data-act="prod-new">'+ico('plus')+'Menu baru</button></div></div><div class="card flush" id="plist">'+productListHTML()+'</div>';
 }
 function ingTabHTML(){
   const J=S.ij||'all',n=k=>db.ingredients.filter(g=>ingJenis(g)===k).length;
@@ -2539,10 +2563,17 @@ INP.table=el=>{S.pos.table=el.value};
 ACT.add=el=>{
   const p=prodById(el.dataset.id);if(!p)return;
   const why=canAdd(p);if(why){toast(why);return}
-  const line=S.pos.cart.find(i=>i.pid===p.id&&!i.note);
-  if(line)line.qty++;else S.pos.cart.push({pid:p.id,name:p.name,price:p.price,cost:unitCost(p),qty:1,note:''});
-  updatePOS();
+  const sj=prodSaji(p);
+  if(sj.length>1){modal({title:p.name,body:'<div class="saji-pick">'+sj.map(k=>'<button class="saji-b saji-'+k+'" data-act="add-saji" data-id="'+p.id+'" data-v="'+k+'">'+esc(sajiLabel(k))+'</button>').join('')+'</div>'});return}
+  addLine(p,sj[0]||null);
 };
+function addLine(p,saji){
+  const line=S.pos.cart.find(i=>i.pid===p.id&&!i.note&&(i.saji||null)===saji);
+  if(line)line.qty++;else{const l={pid:p.id,name:saji?p.name+' ('+sajiLabel(saji)+')':p.name,price:p.price,cost:unitCost(p),qty:1,note:''};if(saji){l.saji=saji;l.base=p.name}S.pos.cart.push(l)}
+  updatePOS();
+}
+ACT['add-saji']=el=>{const p=prodById(el.dataset.id);closeModal();if(p)addLine(p,el.dataset.v)};
+ACT['ci-saji']=el=>{const i=S.pos.cart[+el.dataset.i];if(!i||!i.saji)return;const p=prodById(i.pid),sj=prodSaji(p);if(sj.length<2)return;i.saji=sj[(sj.indexOf(i.saji)+1)%sj.length];i.name=(i.base||p.name)+' ('+sajiLabel(i.saji)+')';updatePOS()};
 ACT.qty=el=>{
   const i=S.pos.cart[+el.dataset.i],d=+el.dataset.d;if(!i)return;
   const p=prodById(i.pid);
