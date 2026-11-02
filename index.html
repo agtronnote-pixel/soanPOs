@@ -346,6 +346,7 @@ textarea.code{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;min-height:2
 .pbar i{display:block;height:100%;background:var(--ok)}
 .pbar i.warn{background:var(--warn)}.pbar i.bad{background:var(--bad)}
 .set-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:14px;align-items:start}
+.sus-bar{margin-bottom:12px;justify-content:space-between}.rk-list{max-height:34vh;overflow:auto;border-top:1px solid var(--line)}
 .banner{display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:16px;background:var(--amber-soft);font-size:12.5px;flex-wrap:wrap}
 .banner b{font-weight:700}
 
@@ -685,8 +686,8 @@ const catName=id=>(db.categories.find(c=>c.id===id)||{}).name||'Tanpa kategori';
 const curShift=()=>db.shifts.find(s=>!s.closeTs);
 const isOwner=()=>S.user&&S.user.role==='owner';
 /* status pengguna & hak akses. role tetap 'owner'/'cashier' agar versi lama tetap paham; status & akses adalah tambahan */
-const STATUS={owner:{label:'Owner',desc:'Akses penuh',akses:null},manager:{label:'Manager',desc:'Operasional & laporan',akses:['pos','sales','menu','reports','customers','shift','finance','inventory','void']},kasir:{label:'Kasir',desc:'Jualan, pelanggan, shift',akses:['pos','sales','customers','shift']},barista:{label:'Barista',desc:'Jualan & shift',akses:['pos','sales','shift']},inventory:{label:'Staf Inventory',desc:'Cek & sesuaikan stok',akses:['inventory']}};
-const AKSES=[['pos','Kasir (jualan)'],['sales','Transaksi'],['customers','Pelanggan'],['shift','Shift & rekap'],['menu','Menu & Bahan'],['reports','Laporan'],['finance','Keuangan'],['inventory','Inventory (cek stok)'],['void','Batalkan transaksi']];
+const STATUS={owner:{label:'Owner',desc:'Akses penuh',akses:null},manager:{label:'Manager',desc:'Operasional & laporan',akses:['pos','sales','menu','reports','customers','shift','finance','inventory','void','rekap']},kasir:{label:'Kasir',desc:'Jualan, pelanggan, shift',akses:['pos','sales','customers','shift']},barista:{label:'Barista',desc:'Jualan & shift',akses:['pos','sales','shift']},inventory:{label:'Staf Inventory',desc:'Cek & sesuaikan stok',akses:['inventory']}};
+const AKSES=[['pos','Kasir (jualan)'],['sales','Transaksi'],['customers','Pelanggan'],['shift','Shift & rekap'],['menu','Menu & Bahan'],['reports','Laporan'],['finance','Keuangan'],['inventory','Inventory (cek stok)'],['void','Batalkan transaksi'],['rekap','Ubah rekap shift']];
 const AKSES_KEYS=AKSES.map(a=>a[0]);
 const firstView=()=>{const n=allowedNav();return n.some(x=>x.id==='pos')?'pos':n[0]?n[0].id:'pos'};
 const userStatus=u=>u&&STATUS[u.status]?u.status:(u&&u.role==='owner'?'owner':'kasir');
@@ -995,8 +996,8 @@ function openShiftCard(){
   return '<div class="card center-card">'+mark('mark-lg')+'<h2>Buka shift untuk mulai berjualan</h2><p class="muted help">Hitung uang tunai di Drawer (laci kasir), lalu masukkan sebagai kas awal.'+(kb!=null?' Menurut catatan, Drawer berisi '+rp(kb)+'.':'')+'</p><div class="fld" style="width:100%"><label class="lbl" for="oc">Kas awal</label><input class="in" id="oc" inputmode="numeric" value="'+(kb!=null?kb:(last?200000:200000))+'"></div><button class="btn primary" data-act="open-shift">Buka shift</button></div>';
 }
 VIEWS.pos=function(){
-  if(!curShift())return openShiftCard();
-  return '<div class="pos'+(UI.cartMode==='popup'?' pop':'')+'"><section class="pos-main"><div class="toolbar">'+(partOn('pos','kat')?'<span class="pcat-f">'+thf('kcat','Kategori')+'</span>':'')+(partOn('pos','cari')?'<input class="in search" id="pq" data-in="posq" placeholder="Cari menu atau SKU" value="'+esc(S.pos.q)+'" aria-label="Cari menu" style="width:240px;max-width:100%">':'')+(db.held.length&&partOn('pos','held')?'<button class="btn sm ghost" data-act="held">'+ico('pause')+'Tersimpan <span class="badge">'+db.held.length+'</span></button>':'')+'</div><div class="grid" id="grid">'+gridHTML()+'</div></section><aside class="cart'+(S.pos.cartOpen?' open':'')+'" id="cart">'+cartHTML()+'</aside></div><div class="cart-bg'+(S.pos.cartOpen?' on':'')+'" id="cart-bg" data-act="cart-close"></div><button class="cart-fab'+(UI.cartMode==='popup'?' pop':'')+'" id="fab" data-act="cart-toggle"'+(cartCount()?'':' hidden')+'>'+fabHTML()+'</button>';
+  if(!curShift()&&!S.sus)return openShiftCard();
+  return (S.sus?susBanner():'')+'<div class="pos'+(UI.cartMode==='popup'?' pop':'')+'"><section class="pos-main"><div class="toolbar">'+(partOn('pos','kat')?'<span class="pcat-f">'+thf('kcat','Kategori')+'</span>':'')+(partOn('pos','cari')?'<input class="in search" id="pq" data-in="posq" placeholder="Cari menu atau SKU" value="'+esc(S.pos.q)+'" aria-label="Cari menu" style="width:240px;max-width:100%">':'')+(db.held.length&&partOn('pos','held')?'<button class="btn sm ghost" data-act="held">'+ico('pause')+'Tersimpan <span class="badge">'+db.held.length+'</span></button>':'')+'</div><div class="grid" id="grid">'+gridHTML()+'</div></section><aside class="cart'+(S.pos.cartOpen?' open':'')+'" id="cart">'+cartHTML()+'</aside></div><div class="cart-bg'+(S.pos.cartOpen?' on':'')+'" id="cart-bg" data-act="cart-close"></div><button class="cart-fab'+(UI.cartMode==='popup'?' pop':'')+'" id="fab" data-act="cart-toggle"'+(cartCount()?'':' hidden')+'>'+fabHTML()+'</button>';
 };
 
 /* pembayaran */
@@ -1047,8 +1048,9 @@ function completeSale(){
   const T=totals(),p=S.pay,st=db.settings;
   let paid=T.total,change=0;
   if(p.method==='cash'){paid=num(p.received);if(paid<T.total)return;change=paid-T.total}
-  const ts=Date.now(),no=nextNo(ts);
-  const sale=Object.assign({id:uid(),no,ts,userId:S.user.id,customerId:S.pos.customerId,type:S.pos.type,table:S.pos.type==='dine'?S.pos.table:'',items:cart.map(i=>{const pr=prodById(i.pid),rc=lineRec(i,S.pos.type),rcost=rc.reduce((a,r)=>{const g=ingById(r.iid);return a+(g?(+g.cost||0)*r.qty:0)},0);const cost=pr&&modeOf(pr)==='recipe'?Math.round(rcost):Math.round((pr?unitCost(pr):i.cost)*(1)+rcost);const o={pid:i.pid,name:i.name,price:i.price,cost,qty:i.qty,note:i.note,rec:rc};if(i.saji)o.saji=i.saji;if(i.uk){o.uk=i.uk;o.ukl=i.ukl}if(i.ad&&i.ad.length)o.ad=i.ad.slice();if(i.saji||i.uk||(i.ad&&i.ad.length))o.base=i.base||i.name;return o}),discType:S.pos.disc.type,discValue:S.pos.disc.value,taxRate:st.taxEnabled?st.taxRate:0,serviceRate:st.serviceEnabled?st.serviceRate:0,method:p.method,ref:p.ref||'',paid,change,status:'paid',shiftId:curShift().id,points:0},T);
+  const sus=S.sus&&db.shifts.find(x=>x.id===S.sus.shiftId),ts=sus?S.sus.ts:Date.now(),no=nextNo(ts);
+  const sale=Object.assign({id:uid(),no,ts,userId:S.user.id,customerId:S.pos.customerId,type:S.pos.type,table:S.pos.type==='dine'?S.pos.table:'',items:cart.map(i=>{const pr=prodById(i.pid),rc=lineRec(i,S.pos.type),rcost=rc.reduce((a,r)=>{const g=ingById(r.iid);return a+(g?(+g.cost||0)*r.qty:0)},0);const cost=pr&&modeOf(pr)==='recipe'?Math.round(rcost):Math.round((pr?unitCost(pr):i.cost)*(1)+rcost);const o={pid:i.pid,name:i.name,price:i.price,cost,qty:i.qty,note:i.note,rec:rc};if(i.saji)o.saji=i.saji;if(i.uk){o.uk=i.uk;o.ukl=i.ukl}if(i.ad&&i.ad.length)o.ad=i.ad.slice();if(i.saji||i.uk||(i.ad&&i.ad.length))o.base=i.base||i.name;return o}),discType:S.pos.disc.type,discValue:S.pos.disc.value,taxRate:st.taxEnabled?st.taxRate:0,serviceRate:st.serviceEnabled?st.serviceRate:0,method:p.method,ref:p.ref||'',paid,change,status:'paid',shiftId:sus?sus.id:curShift().id,points:0},T);
+  if(sus)sale.susulan={by:S.user.id,at:Date.now()};
   cart.forEach(i=>{const pr=prodById(i.pid);if(pr&&modeOf(pr)==='stock'){stkAdd(pr,-i.qty);logStock(pr.id,'sale',-i.qty,no)}});
   {const pt=(db.settings.perTrx||[]).filter(r=>r.iid&&ingById(r.iid)&&+r.qty>0).map(r=>({iid:r.iid,qty:+r.qty}));if(pt.length)sale.trx=pt}
   if(sale.type==='take'||sale.type==='delivery'){const T=S.pos.tambah||{},tb=Object.keys(T).filter(id=>T[id]>0&&ingById(id)).map(id=>({iid:id,qty:T[id]}));if(tb.length)sale.tambah=tb}
@@ -1057,9 +1059,13 @@ function completeSale(){
   const cu=sale.customerId?custById(sale.customerId):null;
   if(cu){sale.points=Math.floor(T.total/st.pointsPer);cu.points+=sale.points}
   db.sales.push(sale);
-  if(sale.method==='cash'&&cashOn()){const mv=cashIn(sale.total,'Penjualan '+sale.no,{ref:sale.id});if(mv)setTimeout(()=>toast('Drawer lebih dari '+rp(drawerLimit())+': '+rp(mv)+' dipindah ke Dompet'),2600)}
+  if(sus&&sale.method==='cash'&&S.sus.kasSudah)sale.kasSudah=1;
+  if(sus){shiftEditLog(sus,'Transaksi susulan '+sale.no+' · '+rp(sale.total));S.sus=null}
+  if(sale.method==='cash'&&cashOn()&&!sale.kasSudah){const mv=cashIn(sale.total,'Penjualan '+sale.no+(sus?' (susulan)':''),{ref:sale.id});if(mv)setTimeout(()=>toast('Drawer lebih dari '+rp(drawerLimit())+': '+rp(mv)+' dipindah ke Dompet'),2600)}
+  if(sus)shiftRecalc(sus);
   save();
   S.pos=Object.assign(freshPos(),{cat:S.pos.cat,q:S.pos.q});S.pay=null;
+  if(sus&&!curShift())S.view='shift';
   render();showReceipt(sale,true);autoPrint(sale);
   setTimeout(waTick,1500);
 }
@@ -1138,7 +1144,7 @@ function salesListHTML(){
   const rows=shown.map(s=>{
     const cu=s.customerId?custById(s.customerId):null;
     const C=scols(),u=userById(s.userId),isi=s.items.map(i=>i.qty+'× '+i.name).join(', ');
-    return '<tr data-act="sale-open" data-id="'+s.id+'"><td><b>'+esc(s.no)+'</b>'+(s.manual?' <span class="pill">rekap manual</span>':'')+(C.waktu?'<div class="sub">'+fmtDT(s.ts)+'</div>':'')+'</td>'
+    return '<tr data-act="sale-open" data-id="'+s.id+'"><td><b>'+esc(s.no)+'</b>'+(s.manual?' <span class="pill">rekap manual</span>':'')+(s.susulan?' <span class="pill amber">susulan</span>':'')+(C.waktu?'<div class="sub">'+fmtDT(s.ts)+'</div>':'')+'</td>'
      +(C.pelanggan||C.tipe?'<td>'+(C.pelanggan?(cu?esc(cu.name):'<span class="muted">Umum</span>'):'')+(C.tipe?(C.pelanggan?'<div class="sub">':'<div>')+TYPES[s.type]+(s.table?' · Meja '+esc(s.table):'')+'</div>':'')+'</td>':'')
      +(C.kasir?'<td>'+esc(u?u.name:'-')+'</td>':'')+(C.isi?'<td class="s-isi" title="'+esc(isi)+'">'+esc(isi)+'</td>':'')
      +(C.metode?'<td><span class="pill">'+METHODS[s.method]+'</span></td>':'')+(C.diskon?'<td class="r">'+(s.discount?'−'+rp(s.discount):'<span class="muted">-</span>')+'</td>':'')+'<td class="r"><b>'+rp(s.total)+'</b></td>'+(C.status?'<td>'+(s.status==='void'?'<span class="pill bad">Dibatalkan</span>':'<span class="pill ok">Lunas</span>')+'</td>':'')+'</tr>';
@@ -1165,6 +1171,7 @@ function voidGo(id){
   Object.keys(back).forEach(id=>{const g=ingById(id);if(g){stkAdd(g,back[id]);logIng(id,'void',back[id],s.no)}});
   const cu=s.customerId?custById(s.customerId):null;if(cu)cu.points=Math.max(0,cu.points-(s.points||0));
   if(s.method==='cash'&&cashOn())cashOut(s.total,'Pembatalan '+s.no,{ref:s.id});
+  {const sh=db.shifts.find(x=>x.id===s.shiftId);if(sh&&sh.closeTs&&!sh.manual){shiftEditLog(sh,'Pembatalan '+s.no+' · '+rp(s.total));shiftRecalc(sh)}}
   save();closeModal();render();toast('Transaksi dibatalkan');
 }
 
@@ -1411,9 +1418,76 @@ function recapModal(sh){
   const r=shiftRecap(sh);S.recapId=sh.id;
   const view=recapLines(r).map(l=>l.t?'<div'+(l.b?' class="rk-b"':'')+'>'+esc(l.t)+'</div>':'<div class="rk-e"></div>').join('');
   modal({title:'Rekap shift',wide:true,body:'<div class="rk">'+view+'</div>'+(r.closed?'':'<p class="muted help" style="margin-top:10px">Shift belum ditutup. Uang tunai aktual terisi setelah tutup shift.</p>'),
-    foot:'<button class="btn ghost" data-act="recap-copy">'+ico('copy')+'Salin teks</button><button class="btn ghost" data-act="recap-print">'+ico('receipt')+'Cetak</button>'+(fiturOn('wa')?'<button class="btn primary" data-act="wa-send" data-ev="tutup" data-id="'+sh.id+'">Kirim ke grup</button>':'')});
+    foot:(rkEditOk(sh)?'<button class="btn ghost" data-act="rk-edit">Ubah rekap</button>':'')+'<button class="btn ghost" data-act="recap-copy">'+ico('copy')+'Salin teks</button><button class="btn ghost" data-act="recap-print">'+ico('receipt')+'Cetak</button>'+(fiturOn('wa')?'<button class="btn primary" data-act="wa-send" data-ev="tutup" data-id="'+sh.id+'">Kirim ke grup</button>':'')});
 }
 const recapShift=()=>db.shifts.find(x=>x.id===S.recapId);
+/* ========== ubah rekap shift yang sudah ditutup ==========
+   - Transaksi susulan: dimasukkan lewat Kasir (menu, opsi, stok sama seperti biasa) lalu disimpan ke shift
+     aslinya dengan jam yang dipilih. Tunai: pilih apakah uangnya sudah ikut dihitung saat tutup shift
+     (jurnal kas tidak berubah) atau baru masuk Drawer sekarang.
+   - Kas awal & uang tunai hasil hitung bisa dikoreksi; koreksi hitung tutup dibukukan di jurnal kas.
+   - Setiap perubahan dicatat di sh.edits (waktu, oleh, alasan). */
+function shiftRecalc(sh){if(!sh||!sh.closeTs)return;const r=shiftRecap(sh);if(r.diff!=null){sh.diff=r.diff;sh.expectedCash=sh.closeCash-r.diff}}
+function shiftEditLog(sh,note){if(!Array.isArray(sh.edits))sh.edits=[];sh.edits.push({ts:Date.now(),by:S.user?S.user.id:null,note})}
+const rkEditOk=sh=>!!(sh&&sh.closeTs&&!sh.manual&&canDo('rekap'));
+function rkEditModal(sh){
+  S.recapId=sh.id;const u=userById(sh.userId);
+  const ss=db.sales.filter(s=>s.shiftId===sh.id).sort((a,b)=>a.ts-b.ts);
+  const list=ss.map(s=>'<button class="list-row wa-opt" data-act="sale-open" data-id="'+s.id+'"><div class="l"><b>'+esc(s.no)+(s.susulan?' <span class="pill amber">susulan</span>':'')+(s.status!=='paid'?' <span class="pill bad">batal</span>':'')+'</b><span class="muted">'+fmtTime(s.ts)+' · '+esc(METHODS[s.method]||s.method)+' · '+s.items.reduce((a,i)=>a+i.qty,0)+' item</span></div><b class="num">'+rp(s.total)+'</b></button>').join('')||'<p class="muted">Belum ada transaksi.</p>';
+  const ed=(sh.edits||[]).slice().reverse().map(e=>{const w=userById(e.by);return '<div class="list-row"><div class="l"><b>'+esc(e.note)+'</b><span class="muted">'+fmtDT(e.ts)+(w?' · '+esc(w.name):'')+'</span></div></div>'}).join('');
+  modal({title:'Ubah rekap shift',wide:true,body:'<div class="form">'
+    +'<p class="muted" style="margin:0">'+fmtDate(sh.openTs)+' · '+fmtTime(sh.openTs)+' – '+fmtTime(sh.closeTs)+' · '+esc(u?u.name:'-')+'</p>'
+    +'<div class="card-h" style="margin-top:4px"><h3>Transaksi ('+ss.length+')</h3><button class="btn sm primary" data-act="rk-sus">'+ico('plus')+'Tambah transaksi susulan</button></div>'
+    +'<div class="rk-list">'+list+'</div>'
+    +'<div class="fld-row"><div class="fld"><label class="lbl" for="rk-oc">Kas awal (Drawer)</label><input class="in" id="rk-oc" inputmode="numeric" value="'+(+sh.openCash||0)+'"></div><div class="fld"><label class="lbl" for="rk-cc">Uang tunai dihitung saat tutup</label><input class="in" id="rk-cc" inputmode="numeric" value="'+(+sh.closeCash||0)+'"></div></div>'
+    +'<div class="fld"><label class="lbl" for="rk-why">Alasan perubahan</label><input class="in" id="rk-why" placeholder="Contoh: salah hitung uang laci"></div>'
+    +(ed?'<div class="lbl" style="margin-top:6px">Riwayat perubahan</div>'+ed:'')
+    +'</div>',
+    foot:'<button class="btn ghost" data-act="rk-back">Kembali ke rekap</button><button class="btn primary" data-act="rk-edit-go">Simpan</button>'});
+}
+ACT['rk-edit']=()=>{const sh=recapShift();if(rkEditOk(sh))rkEditModal(sh)};
+ACT['rk-edit-row']=el=>{const sh=db.shifts.find(x=>x.id===el.dataset.id);if(rkEditOk(sh))rkEditModal(sh)};
+ACT['rk-back']=()=>{const sh=recapShift();if(sh)recapModal(sh)};
+ACT['rk-edit-go']=()=>{
+  const sh=recapShift();if(!rkEditOk(sh))return;
+  const oc=num($('#rk-oc').value),cc=num($('#rk-cc').value),why=$('#rk-why').value.trim(),ch=[];
+  if(oc!==(+sh.openCash||0))ch.push('Kas awal '+rp(sh.openCash)+' → '+rp(oc));
+  if(cc!==(+sh.closeCash||0))ch.push('Uang dihitung '+rp(sh.closeCash)+' → '+rp(cc));
+  if(!ch.length){toast('Tidak ada perubahan');return}
+  if(!why){toast('Isi alasan perubahan');$('#rk-why').focus();return}
+  const d=cc-(+sh.closeCash||0);
+  if(d&&sh.dompetOpen!=null&&cashOn())cashEntry('drawer',d>0?'debit':'kredit',Math.abs(d),'Koreksi hitung tutup shift '+fmtDate(sh.openTs)+' ('+why+')',{ref:sh.id});
+  sh.openCash=oc;sh.closeCash=cc;shiftEditLog(sh,ch.join(' · ')+' — '+why);shiftRecalc(sh);
+  save();render();recapModal(sh);toast('Rekap shift diperbarui');
+};
+/* transaksi susulan: pilih jam (di dalam jam shift) lalu input di Kasir */
+ACT['rk-sus']=()=>{
+  const sh=recapShift();if(!rkEditOk(sh))return;
+  if(S.pos.cart.length){toast('Simpan atau kosongkan pesanan di Kasir dulu');return}
+  const dl=ts=>{const d=new Date(ts);return isoDate(d)+'T'+hhmm(ts)};
+  modal({title:'Transaksi susulan',body:'<div class="form"><p class="muted" style="margin:0">Shift '+fmtDate(sh.openTs)+' · '+fmtTime(sh.openTs)+' – '+fmtTime(sh.closeTs)+'</p>'
+    +'<div class="fld"><label class="lbl" for="sus-ts">Waktu transaksi</label><input class="in" type="datetime-local" id="sus-ts" value="'+dl(Math.max(sh.openTs,sh.closeTs-60000))+'" min="'+dl(sh.openTs)+'" max="'+dl(sh.closeTs)+'"></div>'
+    +(cashOn()?'<div class="lbl">Bila dibayar tunai</div><div class="seg" role="group" aria-label="Uang tunai"><button class="on" data-act="sus-kas" data-v="1">Sudah ikut dihitung saat tutup</button><button data-act="sus-kas" data-v="0">Masuk Drawer sekarang</button></div>':'')
+    +'</div>',foot:'<button class="btn ghost" data-act="rk-edit">Batal</button><button class="btn primary" data-act="sus-go">Lanjut ke Kasir</button>'});
+  S.susKas=1;
+};
+ACT['sus-kas']=el=>{S.susKas=+el.dataset.v;$$('[data-act="sus-kas"]').forEach(b=>b.classList.toggle('on',b===el))};
+ACT['sus-go']=()=>{
+  const sh=recapShift();if(!rkEditOk(sh))return;
+  const v=$('#sus-ts').value,m=/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(v||'');if(!m){toast('Isi waktu transaksi');return}
+  let ts=new Date(+m[1],+m[2]-1,+m[3],+m[4],+m[5]).getTime();
+  if(ts<sh.openTs-60000||ts>sh.closeTs){toast('Waktu harus di dalam jam shift ('+fmtTime(sh.openTs)+' – '+fmtTime(sh.closeTs)+')');return}
+  ts=Math.min(Math.max(ts,sh.openTs),sh.closeTs);
+  S.sus={shiftId:sh.id,ts,kasSudah:cashOn()?S.susKas!==0:false};
+  if(!canView('pos')){toast('Akun ini tidak punya akses Kasir');S.sus=null;return}
+  go('pos');
+};
+ACT['sus-cancel']=()=>{S.sus=null;if(!S.pos.cart.length&&!curShift()){go('shift');return}render()};
+function susBanner(){
+  const sh=S.sus&&db.shifts.find(x=>x.id===S.sus.shiftId);if(!sh){S.sus=null;return ''}
+  return '<div class="banner sus-bar"><span><b>Transaksi susulan</b> · shift '+fmtDate(sh.openTs)+' '+fmtTime(sh.openTs)+'–'+fmtTime(sh.closeTs)+' · dicatat jam '+fmtTime(S.sus.ts)+'</span><button class="btn sm ghost" data-act="sus-cancel">Batal</button></div>';
+}
+
 ACT['shift-recap']=el=>{const sh=db.shifts.find(x=>x.id===el.dataset.id)||curShift();if(sh)recapModal(sh)};
 ACT['recap-copy']=()=>{const sh=recapShift();if(sh)copyText(recapText(shiftRecap(sh)))};
 ACT['recap-share']=()=>{const sh=recapShift();if(!sh)return;navigator.share({title:'Rekap shift',text:recapText(shiftRecap(sh))}).catch(()=>{})};
@@ -1980,7 +2054,7 @@ VIEWS.shift=function(){
   }
   const hist=db.shifts.filter(s=>s.closeTs).sort((a,b)=>b.closeTs-a.closeTs).slice(0,14).map(s=>{
     const x=shiftStats(s),u=userById(s.userId),d=s.diff||0;
-    return '<tr><td><b>'+fmtDate(s.openTs)+'</b>'+(s.manual?' <span class="pill">manual</span>':'')+'<div class="sub">'+fmtTime(s.openTs)+' – '+fmtTime(s.closeTs)+'</div></td><td>'+esc(u?u.name:'-')+'</td><td class="r">'+rp(s.openCash)+'</td><td class="r">'+rp(x.total)+'</td><td class="r">'+rp(s.expectedCash)+'</td><td class="r">'+rp(s.closeCash)+'</td><td><span class="pill '+(d===0?'ok':d<0?'bad':'warn')+'">'+(d===0?'Cocok':(d>0?'Lebih ':'Kurang ')+rp(Math.abs(d)))+'</span></td><td class="r"><button class="btn sm ghost" data-act="shift-recap" data-id="'+s.id+'">Rekap</button>'+(s.manual&&fiturOn('backfill')?' <button class="btn sm ghost" data-act="bf-edit" data-id="'+s.id+'">Ubah</button>':'')+(s.manual&&S.user.role==='owner'?' <button class="btn sm ghost" data-act="bf-delshift" data-id="'+s.id+'" aria-label="Hapus rekap manual">'+ico('trash')+'</button>':'')+'</td></tr>';
+    return '<tr><td><b>'+fmtDate(s.openTs)+'</b>'+(s.manual?' <span class="pill">manual</span>':'')+'<div class="sub">'+fmtTime(s.openTs)+' – '+fmtTime(s.closeTs)+'</div></td><td>'+esc(u?u.name:'-')+'</td><td class="r">'+rp(s.openCash)+'</td><td class="r">'+rp(x.total)+'</td><td class="r">'+rp(s.expectedCash)+'</td><td class="r">'+rp(s.closeCash)+'</td><td><span class="pill '+(d===0?'ok':d<0?'bad':'warn')+'">'+(d===0?'Cocok':(d>0?'Lebih ':'Kurang ')+rp(Math.abs(d)))+'</span></td><td class="r"><button class="btn sm ghost" data-act="shift-recap" data-id="'+s.id+'">Rekap</button>'+(s.manual&&fiturOn('backfill')?' <button class="btn sm ghost" data-act="bf-edit" data-id="'+s.id+'">Ubah</button>':'')+(rkEditOk(s)?' <button class="btn sm ghost" data-act="rk-edit-row" data-id="'+s.id+'">Ubah</button>':'')+(s.manual&&S.user.role==='owner'?' <button class="btn sm ghost" data-act="bf-delshift" data-id="'+s.id+'" aria-label="Hapus rekap manual">'+ico('trash')+'</button>':'')+'</td></tr>';
   }).join('');
   return parts('shift',{aktif:cur,riwayat:'<div class="card flush"><div class="card-h" style="padding:16px 18px 0"><h3>Riwayat shift</h3>'+(fiturOn('backfill')?'<button class="btn sm ghost" data-act="bf-open">'+ico('plus')+'Input rekap terlewat</button>':'')+'</div>'+(hist?'<div class="tablewrap"><table style="min-width:790px"><thead><tr><th>Tanggal</th><th>Kasir</th><th class="r">Kas awal</th><th class="r">Penjualan</th><th class="r">Seharusnya</th><th class="r">Dihitung</th><th>Selisih</th><th class="r">Laporan</th></tr></thead><tbody>'+hist+'</tbody></table></div>':empty('Belum ada shift yang ditutup','Riwayat muncul setelah shift pertama ditutup.'))+'</div>'});
 };
