@@ -111,6 +111,8 @@ body.no-hpp .hpp,body.no-hpp .rc-row .rc-c,body.no-hpp .fld:has(#rs-cost),body.n
 .tb-list{display:flex;flex-direction:column}.tb-r{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:12px 0;border-bottom:1px solid var(--line)}.tb-r b{display:block}.tb-r small{color:var(--muted);font-size:12px}.tb-q{display:flex;align-items:center;gap:12px}.tb-q b{min-width:22px;text-align:center;font-size:18px}.tb-q .qbtn{width:40px;height:40px;font-size:20px}
 .ic-row{display:grid;grid-template-columns:minmax(0,1fr) 28px auto auto auto;gap:6px;align-items:center;margin-bottom:6px}.imp-k{width:auto;max-width:48%;min-height:36px;padding:4px 26px 4px 8px;font-size:13px}
 .pr-r{display:grid;grid-template-columns:minmax(0,1fr) 110px auto;gap:6px;align-items:center}
+#upd-bar{position:fixed;left:50%;transform:translateX(-50%);top:calc(12px + env(safe-area-inset-top,0px));z-index:170;display:flex;align-items:center;gap:10px;background:var(--ink);color:var(--bg);border-radius:14px;padding:10px 10px 10px 16px;box-shadow:0 12px 30px rgba(0,0,0,.25);width:min(460px,calc(100vw - 32px))}#upd-bar span{flex:1;min-width:0}#upd-bar b{display:block;font-size:14px}#upd-bar small{display:block;font-size:12px;opacity:.75}#upd-bar .icon-btn{color:var(--bg);border-color:rgba(255,255,255,.25)}
+.app-ver{font-size:11px;color:var(--side-muted,rgba(255,255,255,.5));padding:0 6px}
 .dv-seg{width:100%}.dr-bar{display:flex;gap:10px 14px;align-items:flex-end;flex-wrap:wrap;margin:-4px 0 12px}.dr{display:flex;gap:8px;flex-wrap:wrap}.dr-f{display:flex;flex-direction:column;gap:3px;font-size:12px;color:var(--muted);font-weight:600}.dr-f .in{min-height:40px;padding:6px 10px;width:auto}.sv-top{margin-bottom:8px}.sv-seg{width:auto;min-width:230px}.s-isi{max-width:260px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.imp-sum{font-size:13px;margin:4px 0 8px}.imp-g{margin-top:8px}.imp-r{display:flex;justify-content:space-between;align-items:center;gap:10px;padding:7px 0;border-top:1px solid var(--line)}.imp-r.ada{opacity:.5}.imp-n{min-width:0}.imp-n b{display:block;font-size:13.5px}.imp-n small{color:var(--muted);font-size:11.5px}#imp-prev{max-height:46vh;overflow:auto}.dv-pg{display:flex;flex-direction:column;gap:6px;padding:10px 0;border-top:1px dashed var(--line)}.dv-pn{font-size:13px;font-weight:600;min-width:0}.dv-pn small{color:var(--muted);font-weight:400}.dv-li3{grid-template-columns:auto minmax(0,1fr) auto}.dv-reset{padding:14px 2px 0}
 .dv-foot{display:flex;gap:8px;justify-content:flex-end;padding:12px 16px calc(12px + env(safe-area-inset-bottom,0px));border-top:1px solid var(--line)}.dv-foot .btn:disabled{opacity:.45}
 @media (max-width:999px){body.dev-on{padding-right:0}#devbar{width:auto;left:0;top:auto;height:62dvh;border-left:0;border-top:1px solid var(--line);border-radius:18px 18px 0 0;box-shadow:0 -10px 30px rgba(0,0,0,.2)}body.dev-on .content{padding-bottom:calc(62dvh + 16px)}}
@@ -909,14 +911,14 @@ function shellHTML(inner){
   const cur=NAV.find(n=>n.id===S.view);
   const shiftTxt=sh?'<span class="dot"></span><b>Shift terbuka</b><span>sejak '+fmtTime(sh.openTs)+' · '+esc((userById(sh.userId)||{name:'-'}).name)+'</span>':'<span class="dot off"></span><b>Shift belum dibuka</b>';
   const dark=(document.documentElement.dataset.theme||(matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light'))==='dark';
-  return '<div class="app"><aside class="side"><div class="brand">'+mark('mark-sm')+wordmark+'</div><nav class="nav">'+side+'</nav><div class="side-foot"><div class="shift-card">'+shiftTxt+'</div><div class="user-chip"><span class="avatar">'+esc(u.name.charAt(0))+'</span><div class="who"><b>'+esc(u.name)+'</b><span>'+esc(statusLabel(u))+'</span></div><button class="icon-btn" data-act="logout" aria-label="Keluar">'+ico('logout')+'</button></div></div></aside>'
+  return '<div class="app"><aside class="side"><div class="brand">'+mark('mark-sm')+wordmark+'</div><nav class="nav">'+side+'</nav><div class="side-foot"><span class="app-ver" data-appver></span><div class="shift-card">'+shiftTxt+'</div><div class="user-chip"><span class="avatar">'+esc(u.name.charAt(0))+'</span><div class="who"><b>'+esc(u.name)+'</b><span>'+esc(statusLabel(u))+'</span></div><button class="icon-btn" data-act="logout" aria-label="Keluar">'+ico('logout')+'</button></div></div></aside>'
    +'<div class="main-wrap"><header class="top">'+mark('mark-sm only-m')+'<div class="ttl"><h1>'+esc(cur?cur.label:'')+'</h1><div class="sub">'+esc(new Date().toLocaleDateString('id-ID',{weekday:'long',day:'numeric',month:'long',year:'numeric'}))+'</div></div>'
    +(db.demo?'<span class="pill amber">Data contoh</span>':'')+syncPill()
    +printerBtn()+'<button class="icon-btn" data-act="theme" aria-label="Ganti tema">'+ico(dark?'sun':'moon')+'</button><button class="icon-btn only-m" data-act="logout" aria-label="Keluar">'+ico('logout')+'</button></header><main class="content" id="main">'+inner+'</main></div><nav class="tabbar" aria-label="Menu utama">'+tab+'</nav></div>';
 }
 
 const VIEWS={};
-function render(){
+function render(){setTimeout(()=>{if(window.soanVerShow)window.soanVerShow()},0);
   const app=$('#app');
   if(!S.user){app.innerHTML=(storageOK?'':'<div style="padding:12px 16px;background:var(--bg)">'+storageBanner()+'</div>')+loginHTML();return}
   if(!canView(S.view))S.view=firstView();
@@ -1884,7 +1886,7 @@ VIEWS.settings=function(){
    sync:syncCardHTML(),
    tampil:'<div class="card"><div class="card-h"><h3>Tampilan</h3></div><label class="chk"><input type="checkbox" data-act="ringkas-tog"'+(ringkasOn()?'':' checked')+'>Tampilkan teks bantuan</label><p class="muted help" style="margin:8px 0 0">Berlaku di perangkat ini.</p></div>',
    printer:printerCardHTML(),
-   data:'<div class="card"><div class="card-h"><h3>Data</h3></div><div class="form">'+storageStatusHTML()+'<button class="btn ghost" data-act="backup">Cadangkan data</button>'+snapBtn()+'<button class="btn ghost" data-act="restore">Pulihkan dari cadangan</button><button class="btn danger" data-act="clear-demo">Hapus transaksi &amp; pelanggan contoh</button><button class="btn danger" data-act="reset-demo">Reset ke data contoh</button></div></div>'})+'</div>';
+   data:'<div class="card"><div class="card-h"><h3>Data</h3><span class="muted" data-appver></span></div><div class="form">'+storageStatusHTML()+'<button class="btn ghost" data-act="backup">Cadangkan data</button>'+snapBtn()+'<button class="btn ghost" data-act="restore">Pulihkan dari cadangan</button><button class="btn danger" data-act="clear-demo">Hapus transaksi &amp; pelanggan contoh</button><button class="btn danger" data-act="reset-demo">Reset ke data contoh</button></div></div>'})+'</div>';
 };
 function aksesHTML(st,u){
   if(st==='owner')return '<p class="muted help" style="margin:0">Owner punya akses penuh, termasuk Pengaturan dan pengguna.</p>';
@@ -3413,5 +3415,28 @@ ACT['ringkas-tog']=()=>{lsSet(RINGKAS_KEY,ringkasOn()?'0':'1');ringkasApply();re
 })();
 })();
 </script>
-<script>if('serviceWorker'in navigator&&!/[?&]preview=1/.test(location.search))addEventListener('load',function(){navigator.serviceWorker.register('sw.js').catch(function(){})})</script>
+<script>
+/* versi aplikasi & pemberitahuan versi baru (nama cache service worker = soankofe-vNN) */
+(function(){
+  var PREV=/[?&]preview=1/.test(location.search),KEY='soankofe.pos.ver';
+  function rd(){try{return JSON.parse(localStorage.getItem(KEY)||'null')}catch(e){return null}}
+  function wr(o){try{localStorage.setItem(KEY,JSON.stringify(o))}catch(e){}}
+  function show(){document.querySelectorAll('[data-appver]').forEach(function(el){var v=window.SOAN_VER;el.textContent=v?('Versi '+v.v+(v.ts?' · '+new Date(v.ts).toLocaleDateString('id-ID',{day:'numeric',month:'short',year:'numeric'}):'')):''})}
+  window.soanVerShow=show;
+  function detect(){if(!('caches'in window))return;caches.keys().then(function(ks){var k=ks.filter(function(x){return /^soankofe-v\d+$/.test(x)}).sort(function(a,b){return +b.slice(10)- +a.slice(10)})[0];if(!k)return;var v=k.slice(9),o=rd();if(!o||o.v!==v){o={v:v,ts:Date.now()};wr(o)}window.SOAN_VER=o;show()}).catch(function(){})}
+  function banner(){if(document.getElementById('upd-bar'))return;var b=document.createElement('div');b.id='upd-bar';b.setAttribute('role','status');b.innerHTML='<span><b>Versi baru tersedia</b><small>Muat ulang saat tidak sedang melayani pembeli.</small></span><button type="button" class="btn sm primary" id="upd-go">Muat ulang</button><button type="button" class="icon-btn" id="upd-x" aria-label="Nanti">✕</button>';document.body.appendChild(b);
+    document.getElementById('upd-go').onclick=function(){location.reload()};document.getElementById('upd-x').onclick=function(){b.remove()}}
+  window.soanUpdBanner=banner;
+  if(!('serviceWorker'in navigator)||PREV)return;
+  addEventListener('load',function(){
+    var had=!!navigator.serviceWorker.controller;
+    navigator.serviceWorker.register('sw.js').then(function(reg){
+      detect();
+      var chk=function(){reg.update().catch(function(){})};
+      setInterval(chk,15*60*1000);document.addEventListener('visibilitychange',function(){if(!document.hidden)chk()});
+    }).catch(function(){});
+    navigator.serviceWorker.addEventListener('controllerchange',function(){detect();if(had)banner();had=true});
+  });
+})();
+</script>
 </html>
