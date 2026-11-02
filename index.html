@@ -280,6 +280,7 @@ td b{font-weight:600}
 
 /* cetak */
 #print-area{display:none}
+.ju{width:100%;border-collapse:collapse;min-width:0}.ju td,.ju th{border:0}.ju .ju-d td{font-weight:700;font-size:13px;padding:12px 8px 4px;border-bottom:1px solid var(--line-2)}.ju th{text-align:left;font-size:12px;color:var(--muted);padding:6px 8px;border-bottom:2px solid var(--line)}.ju td{padding:3px 8px;vertical-align:top;font-size:14px}.ju .ju-e{border-bottom:1px solid var(--line)}.ju .ju-e tr:first-child td{padding-top:9px}.ju .ju-k{padding-left:28px}.ju .ju-n td{color:var(--muted);font-size:12.5px;font-style:italic;padding-bottom:9px}.ju .r{text-align:right;white-space:nowrap;width:110px}@media(max-width:600px){.ju td{font-size:13px;padding:3px 4px}.ju .r{width:auto}.ju .ju-k{padding-left:16px}}.ju tfoot td{border-top:2px solid var(--line);padding:9px 8px}.ju-w{margin:8px 0;max-height:56vh;overflow:auto}.ju-s{display:flex;flex-wrap:wrap;gap:6px 16px;font-size:13px;padding:8px 10px;background:var(--surface-2);border-radius:10px}.ju-s span:first-child{font-weight:700;min-width:80px}
 .rk{font:13px/1.55 ui-monospace,Menlo,Consolas,monospace;background:var(--paper);color:var(--paper-ink);border:1px solid var(--line);border-radius:14px;padding:14px 16px;max-height:58vh;overflow:auto;white-space:pre-wrap;word-break:break-word}
 .rk-b{font-weight:700}
 .bf-row{display:grid;grid-template-columns:minmax(0,1.3fr) minmax(0,1.3fr) 70px 110px auto;gap:6px;margin-top:6px;align-items:center}
@@ -1602,7 +1603,7 @@ function kasLines(ts){
   const d=new Date(ts),b=cashBal(ts),p=n=>String(n).padStart(2,'0');
   return [{t:DAY_EN[d.getDay()]+' : '+p(d.getDate())+'/'+p(d.getMonth()+1)+'/'+d.getFullYear()},{t:'Uang di Drawer :'},{t:rpRekap(b.drawer)},{t:''},{t:'Uang di Dompet :'},{t:rpRekap(b.dompet)}];
 }
-function finRange(r){const t=sod(Date.now());return r==='today'?[t,addDays(t,1)]:r==='yesterday'?[addDays(t,-1),t]:r==='7d'?[addDays(t,-6),addDays(t,1)]:r==='month'?[new Date(new Date().getFullYear(),new Date().getMonth(),1).getTime(),addDays(t,1)]:[0,Infinity]}
+function finRange(r){if(r==='custom'){const F=S.fin||{};return rangeBounds('custom',F.from,F.to)}const t=sod(Date.now());return r==='today'?[t,addDays(t,1)]:r==='yesterday'?[addDays(t,-1),t]:r==='7d'?[addDays(t,-6),addDays(t,1)]:r==='month'?[new Date(new Date().getFullYear(),new Date().getMonth(),1).getTime(),addDays(t,1)]:[0,Infinity]}
 VIEWS.finance=function(){
   const F=S.fin||(S.fin={range:'today',akun:'all'}),b=cashBal(),lim=drawerLimit(),log=db.cashLog||[];
   const sorted=log.slice().sort((a,x)=>a.ts-x.ts),run={drawer:0,dompet:0},saldo={};
@@ -1610,14 +1611,14 @@ VIEWS.finance=function(){
   const [a,z]=finRange(F.range),rows=sorted.filter(e=>e.ts>=a&&e.ts<z&&(F.akun==='all'||e.akun===F.akun)).reverse();
   const sum=(ak,j)=>rows.filter(e=>e.akun===ak&&e.jenis===j).reduce((t,e)=>t+e.jumlah,0);
   const tr=rows.slice(0,300).map(e=>{const u=userById(e.userId);return '<tr><td><b>'+fmtDate(e.ts)+'</b><div class="sub">'+fmtTime(e.ts)+(u?' · '+esc(u.name):'')+'</div></td><td><span class="pill '+(e.akun==='drawer'?'amber':'')+'">'+AKUN[e.akun]+'</span></td><td class="r num" style="color:var(--ok)">'+(e.jenis==='debit'?rp(e.jumlah):'')+'</td><td class="r num" style="color:var(--bad)">'+(e.jenis==='kredit'?rp(e.jumlah):'')+'</td><td>'+esc(e.ket)+(e.auto?' <span class="pill">otomatis</span>':'')+(e.kat==='bahan'?' <span class="pill ok">bahan baku</span>':'')+'</td><td>'+(e.foto?'<a class="btn sm ghost" href="'+esc(fotoHref(e.foto))+'" target="_blank" rel="noopener">Lihat</a>':'<span class="muted">-</span>')+'</td><td class="r num"><b>'+rp(saldo[e.id])+'</b></td></tr>'}).join('');
-  const ranges=[['today','Hari ini'],['yesterday','Kemarin'],['7d','7 hari'],['month','Bulan ini'],['all','Semua']];
+  const ranges=[['today','Hari ini'],['yesterday','Kemarin'],['7d','7 hari'],['month','Bulan ini'],['all','Semua'],['custom','Pilih tanggal']];
   const sh=curShift(),shifts=db.shifts.filter(x=>x.closeTs).sort((p,q)=>q.closeTs-p.closeTs).slice(0,6);
   const recRows=(sh?[sh]:[]).concat(shifts).map(x=>{const u=userById(x.userId),st=shiftStats(x);return '<div class="list-row"><div class="l"><b>'+fmtDate(x.openTs)+' · '+fmtTime(x.openTs)+' – '+(x.closeTs?fmtTime(x.closeTs):'berjalan')+'</b><span class="muted">'+esc(u?u.name:'-')+' · penjualan '+rp(st.total)+'</span></div><button class="btn sm ghost" data-act="shift-recap" data-id="'+x.id+'">Rekap</button></div>'}).join('');
   return (log.length?'':'<div class="banner"><span><b>Mulai pencatatan kas.</b> <span class="help">Isi saldo awal uang di Drawer dan Dompet. Setelah itu penjualan tunai, kas masuk/keluar, dan pembatalan tercatat otomatis.</span></span><button class="btn sm primary" data-act="fin-adj">Isi saldo awal</button></div>')+parts('finance',{
    kpi:'<div class="kpis"><div class="kpi hero"><span class="lbl">Uang di Drawer</span><span class="v">'+rp(b.drawer)+'</span><span class="muted help" style="font-size:12px">Batas '+rp(lim)+' · lebihnya otomatis ke Dompet</span></div><div class="kpi"><span class="lbl">Uang di Dompet</span><span class="v">'+rp(b.dompet)+'</span><span class="muted help" style="font-size:12px">Sumber tunai keluar</span></div><div class="kpi"><span class="lbl">Total kas tunai</span><span class="v">'+rp(b.drawer+b.dompet)+'</span></div></div>',
    aksi:'<div class="toolbar"><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="fin-out">'+ico('wallet')+'Catat pengeluaran</button><button class="btn ghost sec2" data-act="fin-in">'+ico('plus')+'Catat pemasukan</button><button class="btn ghost sec2" data-act="fin-move">Pindah kas</button><button class="btn ghost sec2" data-act="fin-adj">Penyesuaian saldo</button></div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn dark" data-act="fin-print">'+ico('receipt')+'Rekap kas</button><button class="btn ghost sec2" data-act="fin-limit">Batas Drawer</button><button class="btn ghost only-rk" data-act="fin-more">Lainnya ▾</button></div></div>',
    invoice:invoiceCardHTML(),
-   jurnal:'<div class="card flush"><div class="card-h" style="padding:16px 18px 0;flex-wrap:wrap;gap:10px"><h3>Jurnal kas tunai</h3><div class="chips">'+ranges.map(r=>chip('fin-range',r[0],r[1],F.range)).join('')+'</div><button class="btn sm ghost" data-act="fin-csv">'+ico('copy')+'Salin CSV</button></div>'+'<p class="muted help" style="padding:6px 18px 0;margin:0;font-size:12px">Periode ini: Drawer +'+rp(sum('drawer','debit'))+' / −'+rp(sum('drawer','kredit'))+' · Dompet +'+rp(sum('dompet','debit'))+' / −'+rp(sum('dompet','kredit'))+'</p>'+(tr||F.akun!=='all'?'<div class="tablewrap"><table style="min-width:860px"><thead><tr><th>Tanggal</th><th>'+thf('fakun','Kas')+'</th><th class="r">Debit (masuk)</th><th class="r">Kredit (keluar)</th><th>Keterangan</th><th>Foto struk</th><th class="r">Saldo</th></tr></thead><tbody>'+tr+'</tbody></table></div>':'<p class="muted" style="padding:18px">Belum ada catatan kas pada periode ini.</p>')+'</div>',
+   jurnal:'<div class="card flush"><div class="card-h" style="padding:16px 18px 0;flex-wrap:wrap;gap:10px"><h3>Jurnal kas tunai</h3><div class="chips">'+ranges.map(r=>chip('fin-range',r[0],r[1],F.range)).join('')+'</div><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn sm ghost" data-act="fin-ju">Jurnal umum</button><button class="btn sm ghost" data-act="fin-csv">'+ico('copy')+'Salin CSV</button></div></div>'+(F.range==='custom'?'<div class="dr-bar" style="padding:10px 18px 0;margin:0">'+dateRangeHTML('fin',F.from,F.to)+'<span class="muted">'+rangeLabel(a,z)+'</span></div>':'')+'<p class="muted help" style="padding:6px 18px 0;margin:0;font-size:12px">Periode ini: Drawer +'+rp(sum('drawer','debit'))+' / −'+rp(sum('drawer','kredit'))+' · Dompet +'+rp(sum('dompet','debit'))+' / −'+rp(sum('dompet','kredit'))+'</p>'+(tr||F.akun!=='all'?'<div class="tablewrap"><table style="min-width:860px"><thead><tr><th>Tanggal</th><th>'+thf('fakun','Kas')+'</th><th class="r">Debit (masuk)</th><th class="r">Kredit (keluar)</th><th>Keterangan</th><th>Foto struk</th><th class="r">Saldo</th></tr></thead><tbody>'+tr+'</tbody></table></div>':'<p class="muted" style="padding:18px">Belum ada catatan kas pada periode ini.</p>')+'</div>',
    rincian:expBreakdownHTML(a,z),
    rekap:'<div class="card"><div class="card-h"><h3>Rekap penjualan per shift</h3><span class="muted help">Siap cetak & kirim WhatsApp</span></div>'+(recRows||'<p class="muted">Belum ada shift.</p>')+'</div>'});
 };
@@ -1655,7 +1656,52 @@ function expBreakdownHTML(a,z){
   return '<div class="card"><div class="card-h"><h3>Rincian pengeluaran</h3><span class="muted">Bahan baku '+rp(tot('bahan'))+' · Lainnya '+rp(tot('lain'))+'</span></div>'
    +rows.map(r=>'<div class="list-row"><div class="l"><b>'+esc(r.name)+'</b><span class="muted">'+(r.kat==='bahan'?'Bahan baku':'Lainnya')+' · '+r.n.size+'×</span></div><b class="num">'+rp(r.v)+'</b></div>').join('')+'</div>';
 }
-ACT['fin-range']=el=>{S.fin.range=el.dataset.v;render()};
+ACT['fin-range']=el=>{const v=el.dataset.v,F=S.fin;if(v==='custom'&&!F.from){const [a,b]=finRange(F.range==='all'?'7d':F.range);F.from=isoDate(new Date(a));F.to=isoDate(new Date(addDays(b,-1)))}F.range=v;render()};
+CH['fin-date']=()=>{const F=S.fin;F.from=$('#fin-from').value;F.to=$('#fin-to').value;if(F.from&&F.to&&F.from>F.to){const x=F.from;F.from=F.to;F.to=x}render()};
+/* ---- jurnal umum kas (khusus baca): setiap catatan kas ditulis sebagai pasangan Debit / Kredit ---- */
+const KAS_AK={drawer:'Kas Drawer',dompet:'Kas Dompet'};
+function juLawan(e){
+  const k=e.ket||'',d=e.jenis==='debit';
+  if(/^Penjualan /.test(k))return 'Penjualan tunai';
+  if(/^Pembatalan /.test(k))return 'Pembatalan penjualan';
+  if(e.inv)return 'Utang pemasok (invoice)';
+  if(e.kat==='bahan')return 'Pembelian bahan baku';
+  if(/^Saldo awal/.test(k))return 'Saldo awal kas';
+  if(/Penyesuaian|Selisih/.test(k))return 'Selisih kas';
+  return d?'Pemasukan lain':'Biaya / pengeluaran';
+}
+function juEntries(a,z){
+  const L=(db.cashLog||[]).filter(e=>e.ts>=a&&e.ts<z&&KAS_AK[e.akun]).sort((p,q)=>p.ts-q.ts),seen={},out=[];
+  L.forEach(e=>{
+    if(e.grp){if(seen[e.grp])return;seen[e.grp]=1}
+    const g=e.grp?L.filter(x=>x.grp===e.grp):[e],dr=g.filter(x=>x.jenis==='debit'),kr=g.filter(x=>x.jenis==='kredit');
+    const D=dr.map(x=>[KAS_AK[x.akun],x.jumlah]),K=kr.map(x=>[KAS_AK[x.akun],x.jumlah]);
+    if(!dr.length)D.push([juLawan(e),kr.reduce((t,x)=>t+x.jumlah,0)]);
+    if(!kr.length)K.push([juLawan(e),dr.reduce((t,x)=>t+x.jumlah,0)]);
+    const u=userById(e.userId),k0=g.find(x=>x.jenis==='kredit')||e;
+    out.push({ts:e.ts,D,K,ket:k0.label||k0.ket||'',user:u?u.name:'',foto:e.foto});
+  });
+  return out;
+}
+ACT['fin-ju']=()=>{
+  const F=S.fin,[a,z0]=finRange(F.range),z=Math.min(z0,addDays(sod(Date.now()),1)),E=juEntries(a,z);
+  const b0=cashBal(a-1),b1=cashBal(z-1);let td=0,tk=0,last='';
+  const rows=E.map(x=>{
+    const day=fmtDate(x.ts),showD=day!==last;last=day;
+    x.D.forEach(r=>td+=r[1]);x.K.forEach(r=>tk+=r[1]);
+    return (showD?'<tbody><tr class="ju-d"><td colspan="3">'+day+'</td></tr></tbody>':'')+'<tbody class="ju-e">'
+      +x.D.map(r=>'<tr><td>'+esc(r[0])+'</td><td class="r num">'+rp(r[1])+'</td><td></td></tr>').join('')
+      +x.K.map(r=>'<tr><td class="ju-k">'+esc(r[0])+'</td><td></td><td class="r num">'+rp(r[1])+'</td></tr>').join('')
+      +'<tr class="ju-n"><td colspan="3">'+fmtTime(x.ts)+' · '+esc(x.ket)+(x.user?' · '+esc(x.user):'')+(x.foto?' · <a href="'+esc(fotoHref(x.foto))+'" target="_blank" rel="noopener">foto</a>':'')+'</td></tr></tbody>';
+  }).join('');
+  const sal=(t,b)=>'<div class="ju-s"><span>'+t+'</span><span>Drawer <b class="num">'+rp(b.drawer)+'</b></span><span>Dompet <b class="num">'+rp(b.dompet)+'</b></span><span>Total <b class="num">'+rp(b.drawer+b.dompet)+'</b></span></div>';
+  const per=F.range==='all'?'Semua catatan':rangeLabel(a,z);
+  modal({title:'Jurnal umum kas',wide:1,body:'<p class="muted" style="margin:0 0 10px">'+per+' · '+E.length+' jurnal · khusus baca</p>'
+    +sal('Saldo awal',b0)
+    +(E.length?'<div class="tablewrap ju-w"><table class="ju"><thead><tr><th>Akun & keterangan</th><th class="r">Debit</th><th class="r">Kredit</th></tr></thead>'+rows+'<tfoot><tr><td><b>Jumlah</b></td><td class="r num"><b>'+rp(td)+'</b></td><td class="r num"><b>'+rp(tk)+'</b></td></tr></tfoot></table></div>':'<p class="muted" style="padding:14px 0">Belum ada catatan kas pada periode ini.</p>')
+    +sal('Saldo akhir',b1),
+    foot:'<button class="btn primary" data-act="close">Tutup</button>'});
+};
 CH['fin-akun']=el=>{S.fin.akun=el.value;render()};
 THF.fakun={get:()=>S.fin?S.fin.akun:'all',set:v=>{S.fin.akun=v;render()},opts:()=>[['all','Drawer & Dompet'],['drawer','Drawer'],['dompet','Dompet']]};
 function finForm(title,body,act){modal({title,body:'<div class="form">'+body+'</div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="'+act+'">Simpan</button>'})}
