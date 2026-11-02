@@ -187,7 +187,9 @@ a.nav-i,a.tab{text-decoration:none}
 .seg button.on{background:var(--ink);color:var(--bg)}
 
 /* kasir */
-.pos{display:grid;grid-template-columns:minmax(0,1fr) 390px;gap:20px;align-items:start}
+.pos{--cart-w:clamp(290px,24vw,340px);display:grid;grid-template-columns:minmax(0,1fr) var(--cart-w);gap:18px;align-items:start}
+.pcat-f .thf{border:1px solid var(--line);border-radius:999px;padding:8px 14px;margin:0;font-size:13px;font-weight:600;background:var(--surface);min-height:40px}.pcat-f .thf.on{background:var(--amber-soft);border-color:var(--amber)}
+.pos:not(.pop) .cart{padding:14px;gap:10px;border-radius:20px}.pos:not(.pop) .cart .in{min-height:38px}.pos:not(.pop) .cart .seg button{min-height:32px}.pos:not(.pop) .cart .cust-btn{min-height:38px}.pos:not(.pop) .cart .ci{padding:9px 0}.pos:not(.pop) .cart .ci-name{font-size:13.5px}.pos:not(.pop) .cart .sumr.tot{font-size:19px}.pos:not(.pop) .cart .cart-foot .btn{min-height:40px}.pos:not(.pop) .cart .cart-head h2{font-size:17px}
 .pos-main{display:flex;flex-direction:column;gap:14px;min-width:0}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(var(--card-min,158px),1fr));gap:12px}
 .tile{position:relative;display:flex;flex-direction:column;gap:6px;text-align:left;padding:14px;min-height:128px;border:1.5px solid var(--line);border-radius:20px;background:var(--surface);cursor:pointer;transition:border-color .12s,transform .08s}
@@ -387,8 +389,8 @@ textarea.code{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;min-height:2
 }
 /* tablet: panel pesanan di samping (tidak menimpa menu) */
 @media (min-width:700px) and (max-width:999px){
-  .pos:not(.pop){display:grid;grid-template-columns:minmax(0,1fr) 320px;gap:14px;align-items:start}
-  .pos:not(.pop) .cart{position:sticky;inset:auto;top:76px;z-index:auto;transform:none;transition:none;border:1px solid var(--line);border-radius:20px;padding:14px;max-height:calc(100dvh - 76px - 104px - env(safe-area-inset-bottom,0px));overflow:hidden}
+  .pos:not(.pop){display:grid;grid-template-columns:minmax(0,1fr) clamp(260px,34vw,300px);gap:12px;align-items:start}
+  .pos:not(.pop) .cart{position:sticky;inset:auto;top:76px;z-index:auto;transform:none;transition:none;border:1px solid var(--line);border-radius:18px;padding:12px;max-height:calc(100dvh - 76px - 104px - env(safe-area-inset-bottom,0px));overflow:hidden}
   .pos:not(.pop) .cart .only-m{display:none}
   .pos:not(.pop)~.cart-fab{display:none}
   .pos:not(.pop) .cart-head h2{font-size:17px}
@@ -994,8 +996,7 @@ function openShiftCard(){
 }
 VIEWS.pos=function(){
   if(!curShift())return openShiftCard();
-  const cats=[{id:'all',name:'Semua'}].concat(db.categories);
-  return '<div class="pos'+(UI.cartMode==='popup'?' pop':'')+'"><section class="pos-main"><div class="toolbar">'+(partOn('pos','kat')?'<div class="chips">'+cats.map(c=>chip('pcat',c.id,c.name,S.pos.cat)).join('')+'</div>':'')+(partOn('pos','cari')?'<input class="in search" id="pq" data-in="posq" placeholder="Cari menu atau SKU" value="'+esc(S.pos.q)+'" aria-label="Cari menu" style="width:240px;max-width:100%">':'')+(db.held.length&&partOn('pos','held')?'<button class="btn sm ghost" data-act="held">'+ico('pause')+'Tersimpan <span class="badge">'+db.held.length+'</span></button>':'')+'</div><div class="grid" id="grid">'+gridHTML()+'</div></section><aside class="cart'+(S.pos.cartOpen?' open':'')+'" id="cart">'+cartHTML()+'</aside></div><div class="cart-bg'+(S.pos.cartOpen?' on':'')+'" id="cart-bg" data-act="cart-close"></div><button class="cart-fab'+(UI.cartMode==='popup'?' pop':'')+'" id="fab" data-act="cart-toggle"'+(cartCount()?'':' hidden')+'>'+fabHTML()+'</button>';
+  return '<div class="pos'+(UI.cartMode==='popup'?' pop':'')+'"><section class="pos-main"><div class="toolbar">'+(partOn('pos','kat')?'<span class="pcat-f">'+thf('kcat','Kategori')+'</span>':'')+(partOn('pos','cari')?'<input class="in search" id="pq" data-in="posq" placeholder="Cari menu atau SKU" value="'+esc(S.pos.q)+'" aria-label="Cari menu" style="width:240px;max-width:100%">':'')+(db.held.length&&partOn('pos','held')?'<button class="btn sm ghost" data-act="held">'+ico('pause')+'Tersimpan <span class="badge">'+db.held.length+'</span></button>':'')+'</div><div class="grid" id="grid">'+gridHTML()+'</div></section><aside class="cart'+(S.pos.cartOpen?' open':'')+'" id="cart">'+cartHTML()+'</aside></div><div class="cart-bg'+(S.pos.cartOpen?' on':'')+'" id="cart-bg" data-act="cart-close"></div><button class="cart-fab'+(UI.cartMode==='popup'?' pop':'')+'" id="fab" data-act="cart-toggle"'+(cartCount()?'':' hidden')+'>'+fabHTML()+'</button>';
 };
 
 /* pembayaran */
@@ -2926,6 +2927,7 @@ ACT['shift-close-go']=()=>{
   if(waCfg().on&&waCfg().tutup)setTimeout(()=>waAsk('Shift ditutup','Kirim kartu rekap penjualan & kondisi kas (Drawer/Dompet) ke grup '+waCfg().grup+'?','tutup',sh.id),600);
 };
 /* kasir */
+THF.kcat={get:()=>S.pos.cat||'all',set:v=>{S.pos.cat=v;render()},opts:()=>[['all','Semua menu',db.products.filter(p=>p.active!==false).length]].concat(db.categories.map(c=>[c.id,c.name,db.products.filter(p=>p.cat===c.id&&p.active!==false).length]))};
 ACT.pcat=el=>{S.pos.cat=el.dataset.v;$$('[data-act="pcat"]').forEach(b=>b.classList.toggle('on',b.dataset.v===S.pos.cat));updatePOS()};
 INP.posq=el=>{S.pos.q=el.value;updatePOS()};
 INP.table=el=>{S.pos.table=el.value};
