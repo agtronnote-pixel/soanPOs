@@ -3006,9 +3006,9 @@ function receiptLayout(s,cols){
   if(name.length<=Math.floor(cols/2))C(name,{b:1,sz:2});else C(name,{b:1});
   if(st.tagline)C(st.tagline);
   wrapTxt(st.address,cols).forEach(x=>C(x));
-  C('Telp '+st.phone);
+  if(st.phone)C('Telp '+st.phone);
   out.push({t:SEP,a:'l'});
-  LR('No',s.no);LR('Tanggal',fmtDT(s.ts));LR('Kasir',u?u.name:'-');
+  if(s.unpaid){C('TAGIHAN',{b:1});out.push({t:SEP,a:'l'});LR('Pesanan',s.no)}else LR('No',s.no);LR('Tanggal',fmtDT(s.ts));LR('Kasir',u?u.name:'-');
   LR('Jenis',TYPES[s.type]+(s.table?' / Meja '+s.table:''));
   if(cu)LR('Pelanggan',cu.name);
   out.push({t:SEP,a:'l'});
@@ -3020,9 +3020,10 @@ function receiptLayout(s,cols){
   if(s.tax)LR('PPN '+s.taxRate+'%',n(s.tax));
   LR('TOTAL','Rp '+n(s.total),{b:1});
   out.push({t:SEP,a:'l'});
-  LR('Bayar ('+METHODS[s.method]+')','Rp '+n(s.paid));
+  if(s.unpaid)C('*** BELUM DIBAYAR ***',{b:1});
+  else{LR('Bayar ('+METHODS[s.method]+')','Rp '+n(s.paid));
   if(s.method==='cash')LR('Kembali','Rp '+n(s.change));
-  if(s.points)LR('Poin didapat','+'+s.points);
+  if(s.points)LR('Poin didapat','+'+s.points);}
   if(s.status==='void')C('*** DIBATALKAN ***',{b:1});
   out.push({t:SEP,a:'l'});
   wrapTxt(st.footer,cols).forEach(x=>C(x));
@@ -3296,10 +3297,10 @@ ACT.hold=()=>{
   const cu=S.pos.customerId?custById(S.pos.customerId):null;
   const label=S.pos.table?'Meja '+S.pos.table:cu?cu.name:'Pesanan '+(db.held.length+1);
   const p=JSON.parse(JSON.stringify(S.pos));p.cartOpen=false;
-  db.held.push({id:uid(),ts:Date.now(),label,pos:p});save();resetPos();updatePOS();toast('Pesanan disimpan: '+label);
+  db.held.push({id:uid(),ts:Date.now(),label,pos:p,userId:S.user?S.user.id:null});save();resetPos();updatePOS();toast('Pesanan disimpan: '+label);
 };
 ACT.held=()=>{
-  const rows=db.held.map(h=>{const T=computeTotals(h.pos.cart,h.pos.disc,db.settings);return '<div class="list-row"><div class="l"><b>'+esc(h.label)+'</b><span class="muted">'+fmtTime(h.ts)+' · '+h.pos.cart.reduce((a,i)=>a+i.qty,0)+' item · '+rp(T.total)+'</span></div><div style="display:flex;gap:6px"><button class="btn sm primary" data-act="held-resume" data-id="'+h.id+'">Lanjutkan</button><button class="icon-btn sm" data-act="held-del" data-id="'+h.id+'" aria-label="Hapus">'+ico('trash')+'</button></div></div>'}).join('');
+  const rows=db.held.map(h=>{const T=computeTotals(h.pos.cart,h.pos.disc,db.settings);return '<div class="list-row"><div class="l"><b>'+esc(h.label)+'</b><span class="muted">'+fmtTime(h.ts)+' · '+h.pos.cart.reduce((a,i)=>a+i.qty,0)+' item · '+rp(T.total)+'</span></div><div style="display:flex;gap:6px"><button class="btn sm ghost" data-act="held-print" data-id="'+h.id+'" aria-label="Cetak tagihan">'+ico('receipt')+'Cetak</button><button class="btn sm primary" data-act="held-resume" data-id="'+h.id+'">Lanjutkan</button><button class="icon-btn sm" data-act="held-del" data-id="'+h.id+'" aria-label="Hapus">'+ico('trash')+'</button></div></div>'}).join('');
   modal({title:'Pesanan tersimpan',body:rows||empty('Tidak ada pesanan tersimpan','Gunakan tombol Simpan untuk menunda pesanan.')});
 };
 ACT['held-resume']=el=>{
@@ -3307,6 +3308,12 @@ ACT['held-resume']=el=>{
   const i=db.held.findIndex(h=>h.id===el.dataset.id);if(i<0)return;
   S.pos=Object.assign(freshPos(),db.held[i].pos,{cartOpen:false});db.held.splice(i,1);save();closeModal();updatePOS();
 };
+/* cetak tagihan untuk pesanan tersimpan (belum dibayar); tidak mengubah stok / kas */
+function heldBill(h){const P=h.pos,T=computeTotals(P.cart,P.disc,db.settings);
+  return Object.assign({unpaid:true,no:h.label,ts:Date.now(),userId:h.userId||(S.user?S.user.id:null),customerId:P.customerId||null,type:P.type,table:P.type==='dine'?P.table:'',items:P.cart.map(i=>({name:i.name,qty:i.qty,price:i.price,note:i.note})),status:'held',taxRate:db.settings.taxEnabled?db.settings.taxRate:0,serviceRate:db.settings.serviceEnabled?db.settings.serviceRate:0},T)}
+ACT['held-print']=async el=>{const h=db.held.find(x=>x.id===el.dataset.id);if(!h)return;const b=heldBill(h),cfg=printerCfg();
+  if(cfg.mode==='off'){sysPrint(receiptLayout(b,cfg.paper===80?48:32),cfg);return}
+  if(await doPrint(b,true))toast('Tagihan '+h.label+' dicetak')};
 ACT['held-del']=el=>{db.held=db.held.filter(h=>h.id!==el.dataset.id);save();ACT.held();updatePOS()};
 ACT.pay=()=>openPay();
 ACT['pay-method']=el=>{S.pay.method=el.dataset.v;const T=totals();$('#modal-body').innerHTML=payBody(T);$('#modal-foot').innerHTML=payFoot(T)};
