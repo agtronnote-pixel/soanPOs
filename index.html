@@ -1079,6 +1079,7 @@ function completeSale(){
   S.pos=Object.assign(freshPos(),{cat:S.pos.cat,q:S.pos.q});S.pay=null;
   if(sus&&!curShift())S.view='shift';
   render();showReceipt(sale,true);autoPrint(sale);
+  if(printerCfg().waAuto)shareReceiptImg(sale,sale.no,true);
   setTimeout(waTick,1500);
 }
 
@@ -3131,13 +3132,14 @@ function printerCardHTML(){
   else info='Pilih cara mencetak struk. Pengaturan ini tersimpan per perangkat.';
   return '<div class="card"><div class="card-h"><h3>Printer struk</h3></div><div class="form"><div class="fld"><label class="lbl" for="pr-mode">Mode cetak</label><select class="sel" id="pr-mode" data-ch="pr-mode">'+modes.map(m=>'<option value="'+m[0]+'"'+(c.mode===m[0]?' selected':'')+'>'+m[1]+'</option>').join('')+'</select></div><p class="hint" style="font-size:12.5px">'+info+'</p>'
    +'<div class="fld-row"><div class="fld"><label class="lbl" for="pr-paper">Lebar kertas</label><select class="sel" id="pr-paper" data-ch="pr-paper"><option value="58"'+(c.paper===58?' selected':'')+'>58 mm (32 karakter)</option><option value="80"'+(c.paper===80?' selected':'')+'>80 mm (48 karakter)</option></select></div><div class="fld"><label class="lbl" for="pr-copies">Jumlah salinan</label><select class="sel" id="pr-copies" data-ch="pr-copies"><option value="1"'+(c.copies===1?' selected':'')+'>1</option><option value="2"'+(c.copies===2?' selected':'')+'>2</option></select></div></div>'
-   +'<label class="chk"><input type="checkbox" id="pr-auto" data-ch="pr-auto"'+(c.auto?' checked':'')+'>Cetak otomatis setelah pembayaran</label><label class="chk"><input type="checkbox" id="pr-cut" data-ch="pr-cut"'+(c.cut?' checked':'')+'>Potong kertas setelah cetak (jika printer punya pemotong)</label>'
+   +'<label class="chk"><input type="checkbox" id="pr-auto" data-ch="pr-auto"'+(c.auto?' checked':'')+'>Cetak otomatis setelah pembayaran</label><label class="chk"><input type="checkbox" id="pr-wa" data-ch="pr-wa"'+(c.waAuto?' checked':'')+'>Buka kirim WhatsApp (gambar struk) otomatis setelah pembayaran</label><label class="chk"><input type="checkbox" id="pr-cut" data-ch="pr-cut"'+(c.cut?' checked':'')+'>Potong kertas setelah cetak (jika printer punya pemotong)</label>'
    +'<div class="toolbar-r">'+(c.mode==='ble'?'<button class="btn dark" data-act="pr-connect">'+ico('receipt')+(PR.ch?'Ganti printer':'Hubungkan printer')+'</button>':'')+'<button class="btn ghost" data-act="pr-test"'+(c.mode==='off'?' disabled':'')+'>Cetak tes</button><button class="btn ghost" data-act="pr-preview">Pratinjau struk</button></div></div></div>';
 }
 CH['pr-mode']=el=>{setPrinterCfg({mode:el.value});render()};
 CH['pr-paper']=el=>{setPrinterCfg({paper:+el.value})};
 CH['pr-copies']=el=>{setPrinterCfg({copies:+el.value})};
 CH['pr-auto']=el=>{setPrinterCfg({auto:!!el.checked})};
+CH['pr-wa']=el=>{setPrinterCfg({waAuto:!!el.checked})};
 CH['pr-cut']=el=>{setPrinterCfg({cut:!!el.checked})};
 ACT['pr-connect']=async()=>{try{await bleConnect(true);toast('Printer terhubung: '+PR.name)}catch(e){toast(printErr(e))}render()};
 ACT['pr-top']=async()=>{
@@ -3330,13 +3332,14 @@ function receiptPNG(lines,cols){
   });
   return new Promise(r=>cv.toBlob(r,'image/png'));
 }
-async function shareReceiptImg(s,name){
+async function shareReceiptImg(s,name,auto){
   const cols=printerCfg().paper===80?48:32,blob=await receiptPNG(receiptLayout(s,cols),cols);
   const fn=(name||'struk').replace(/[^\w-]+/g,'-')+'.png',file=new File([blob],fn,{type:'image/png'});
   const cu=s.customerId?custById(s.customerId):null,text=(db.settings.storeName||'Soan Kofe')+(s.unpaid?' · Salinan pesanan ':' · Struk ')+(s.no||'');
   if(navigator.canShare&&navigator.canShare({files:[file]})){
-    try{await navigator.share({files:[file],title:text,text});return}catch(e){if(e&&e.name==='AbortError')return}
+    try{await navigator.share({files:[file],title:text,text});return}catch(e){if(e&&e.name==='AbortError')return;if(auto){toast('Ketuk Kirim WA untuk mengirim gambar struk');return}}
   }
+  if(auto)return;
   /* perangkat tanpa fitur bagikan berkas (mis. laptop): simpan gambar, lalu buka WhatsApp */
   toast('Gambar struk disimpan. Lampirkan di WhatsApp');
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);
