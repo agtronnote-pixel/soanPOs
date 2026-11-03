@@ -352,6 +352,8 @@ textarea.code{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;min-height:2
 .pbar i.warn{background:var(--warn)}.pbar i.bad{background:var(--bad)}
 .set-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:14px;align-items:start}
 .sus-bar{margin-bottom:12px;justify-content:space-between}.rk-list{max-height:34vh;overflow:auto;border-top:1px solid var(--line)}
+.rc-copy{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px;border:1px dashed var(--line-2);border-radius:12px}.rc-copy .sel{flex:1;min-width:180px}
+.mb-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.mb-list{max-height:40vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:4px 10px}.mb-r{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}.mb-r:last-child{border-bottom:0}.mb-r span{display:flex;flex-direction:column;min-width:0}.mb-r small{color:var(--muted);font-size:12px}.mb-r em{font-style:normal;color:var(--ink);font-weight:600}
 .gs-sync{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
 .gs-steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:13.5px;line-height:1.45}
 .banner{display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:16px;background:var(--amber-soft);font-size:12.5px;flex-wrap:wrap}
@@ -2265,9 +2267,10 @@ function applyMode(){
   $('#pf-manual').hidden=m==='recipe';
   if(m==='recipe')rcLive();
 }
-function prodForm(id){
-  const p=id?prodById(id):{name:'',sku:'',cat:db.categories[0]?db.categories[0].id:'',price:'',cost:'',track:false,stock:0,min:5,active:true,recipe:[]};
-  S.pfMode=id?modeOf(p):(db.ingredients.length?'recipe':'none');
+function prodForm(id,tpl){
+  S.pfId=id||null;
+  const p=tpl?Object.assign(JSON.parse(JSON.stringify(tpl)),{name:tpl.name+' (salinan)',sku:'',stock:0}):id?prodById(id):{name:'',sku:'',cat:db.categories[0]?db.categories[0].id:'',price:'',cost:'',track:false,stock:0,min:5,active:true,recipe:[]};
+  S.pfMode=id||tpl?modeOf(p):(db.ingredients.length?'recipe':'none');
   S.rd={rows:(p.recipe||[]).map(r=>({iid:r.iid,qty:String(r.qty)}))};
   S.pfx={uk:prodUk(p).map(u=>Object.assign({},u)),ad:prodAddons(p).slice(),sticker:p.sticker!==false};
   if(!S.rd.rows.length)S.rd.rows.push({iid:'',qty:''});
@@ -2275,11 +2278,11 @@ function prodForm(id){
   const cats=db.categories.map(c=>'<option value="'+c.id+'"'+(p.cat===c.id?' selected':'')+'>'+esc(c.name)+'</option>').join('');
   const seg=[['recipe','Resep bahan baku'],['stock','Stok produk jadi'],['none','Tanpa stok']].map(x=>'<button type="button" class="'+(m===x[0]?'on':'')+'" data-act="pf-mode" data-v="'+x[0]+'">'+x[1]+'</button>').join('');
   const recipeBox=db.ingredients.length
-    ?'<div class="rc" id="pf-recipe"'+(m==='recipe'?'':' hidden')+'><div class="lbl">Resep per 1 porsi</div><div id="rc-rows" style="display:flex;flex-direction:column;gap:10px">'+rcRowsHTML()+'</div><div><button type="button" class="btn sm ghost" data-act="rc-add">'+ico('plus')+'Tambah bahan</button></div><div class="rc-sum"><div class="hpp"><span class="lbl">HPP / porsi</span><b id="rc-hpp">—</b></div><div class="hpp"><span class="lbl">Margin</span><b id="rc-mg">—</b></div><div><span class="lbl">Bisa dibuat</span><b id="rc-mk">—</b></div></div></div>'
+    ?'<div class="rc" id="pf-recipe"'+(m==='recipe'?'':' hidden')+'><div class="lbl">Resep per 1 porsi</div><div id="rc-rows" style="display:flex;flex-direction:column;gap:10px">'+rcRowsHTML()+'</div><div><button type="button" class="btn sm ghost" data-act="rc-add">'+ico('plus')+'Tambah bahan</button>'+(rcSrcMenus().length?' <button type="button" class="btn sm ghost" data-act="rc-copy-open">'+ico('copy')+'Salin dari menu…</button>':'')+'</div>'+(rcSrcMenus().length?'<div class="rc-copy" id="rc-copy" hidden><select class="sel" id="rc-src" aria-label="Menu sumber">'+rcSrcMenus().map(x=>'<option value="'+x.id+'">'+esc(x.name)+' · '+x.recipe.length+' bahan</option>').join('')+'</select><button type="button" class="btn sm ghost" data-act="rc-copy" data-v="add">Tambahkan</button><button type="button" class="btn sm ghost" data-act="rc-copy" data-v="rep">Ganti semua</button></div>':'')+'<div class="rc-sum"><div class="hpp"><span class="lbl">HPP / porsi</span><b id="rc-hpp">—</b></div><div class="hpp"><span class="lbl">Margin</span><b id="rc-mg">—</b></div><div><span class="lbl">Bisa dibuat</span><b id="rc-mk">—</b></div></div></div>'
     :'<div class="rc" id="pf-recipe"'+(m==='recipe'?'':' hidden')+'><b>Belum ada bahan baku</b><p class="muted">Tambahkan bahan lebih dulu agar bisa dipakai di resep.</p><div><button type="button" class="btn sm dark" data-act="goto-ing">Tambah bahan baku</button></div></div>';
   const stockBox='<div class="fld-row" id="pf-stockbox"'+(m==='stock'?'':' hidden')+'><div class="fld"><label class="lbl" for="pf-stock">'+(id?'Stok saat ini':'Stok awal')+'</label><input class="in" id="pf-stock" inputmode="numeric" value="'+esc(p.stock||0)+'"'+(id?' disabled':'')+'>'+(id?'<button type="button" class="link" data-act="prod-adj" data-id="'+id+'">Sesuaikan stok</button>':'')+'</div><div class="fld"><label class="lbl" for="pf-min">Batas stok menipis</label><input class="in" id="pf-min" inputmode="numeric" value="'+esc(p.min)+'"></div></div>';
   const manual='<div class="fld hpp" id="pf-manual"'+(m!=='recipe'?'':' hidden')+'><label class="lbl" for="pf-cost">HPP (modal) per porsi</label><input class="in" id="pf-cost" inputmode="numeric" value="'+esc(p.cost)+'"></div>';
-  modal({title:id?'Ubah menu':'Menu baru',wide:true,body:'<div class="form"><div class="fld"><label class="lbl" for="pf-name">Nama menu</label><input class="in" id="pf-name" value="'+esc(p.name)+'"></div><div class="fld-row"><div class="fld"><label class="lbl" for="pf-sku">SKU</label><input class="in" id="pf-sku" value="'+esc(p.sku)+'" placeholder="Otomatis"></div><div class="fld"><label class="lbl" for="pf-cat">Kategori</label><select class="sel" id="pf-cat">'+cats+'</select></div></div><div class="fld"><label class="lbl" for="pf-price">Harga jual</label><input class="in" id="pf-price" data-in="pf-price" inputmode="numeric" value="'+esc(p.price)+'"></div><div class="fld"><span class="lbl">Sumber HPP dan stok</span><div class="seg" role="group" aria-label="Sumber HPP dan stok">'+seg+'</div></div>'+recipeBox+stockBox+manual+'<div id="pf-x">'+pfxHTML()+'</div><div class="fld"><span class="lbl">Pilihan penyajian</span><div class="saji-opt">'+SAJI_KEYS.map(k=>'<label class="chk"><input type="checkbox" data-pfsaji="'+k+'"'+(prodSaji(p).includes(k)?' checked':'')+'>'+esc(sajiLabel(k))+'</label>').join('')+'</div></div><label class="chk"><input type="checkbox" id="pf-active"'+(p.active?' checked':'')+'>Tampilkan di kasir</label></div>',foot:(id?'<button class="btn danger" data-act="prod-del" data-id="'+id+'">Hapus</button>':'')+'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="prod-save" data-id="'+(id||'')+'">Simpan</button>'});
+  modal({title:tpl?'Duplikat menu':id?'Ubah menu':'Menu baru',wide:true,body:'<div class="form"><div class="fld"><label class="lbl" for="pf-name">Nama menu</label><input class="in" id="pf-name" value="'+esc(p.name)+'"></div><div class="fld-row"><div class="fld"><label class="lbl" for="pf-sku">SKU</label><input class="in" id="pf-sku" value="'+esc(p.sku)+'" placeholder="Otomatis"></div><div class="fld"><label class="lbl" for="pf-cat">Kategori</label><select class="sel" id="pf-cat">'+cats+'</select></div></div><div class="fld"><label class="lbl" for="pf-price">Harga jual</label><input class="in" id="pf-price" data-in="pf-price" inputmode="numeric" value="'+esc(p.price)+'"></div><div class="fld"><span class="lbl">Sumber HPP dan stok</span><div class="seg" role="group" aria-label="Sumber HPP dan stok">'+seg+'</div></div>'+recipeBox+stockBox+manual+'<div id="pf-x">'+pfxHTML()+'</div><div class="fld"><span class="lbl">Pilihan penyajian</span><div class="saji-opt">'+SAJI_KEYS.map(k=>'<label class="chk"><input type="checkbox" data-pfsaji="'+k+'"'+(prodSaji(p).includes(k)?' checked':'')+'>'+esc(sajiLabel(k))+'</label>').join('')+'</div></div><label class="chk"><input type="checkbox" id="pf-active"'+(p.active?' checked':'')+'>Tampilkan di kasir</label></div>',foot:(id?'<button class="btn danger" data-act="prod-del" data-id="'+id+'">Hapus</button><button class="btn ghost" data-act="prod-dup" data-id="'+id+'">'+ico('copy')+'Duplikat</button>':'')+'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="prod-save" data-id="'+(id||'')+'">Simpan</button>'});
   rcLive();
 }
 function pfxHTML(){
@@ -2694,7 +2697,7 @@ ACT['dup-link']=()=>{const L=dupStock();modal({title:'Hubungkan menu ke bahan ba
 ACT['dup-go']=()=>{const L=dupStock();let n=0;$$('[data-dup]').forEach(c=>{if(!c.checked)return;const x=L[+c.dataset.dup];if(!x)return;x.p.mode='recipe';x.p.track=false;x.p.recipe=[{iid:x.g.id,qty:1}];x.p.cost=recipeCost(x.p.recipe,db.ingredients);n++});save();closeModal();render();toast(n+' menu dihubungkan ke bahan baku')};
 function menuTabHTML(){
   const dup=dupStock();
-  return '<div class="toolbar"><div class="toolbar-r"><input class="in search" data-in="pq" placeholder="Cari menu atau SKU" value="'+esc(S.pq)+'" aria-label="Cari menu"></div><div class="toolbar-r"><button class="btn ghost" data-act="saji-set">Pilihan menu</button><button class="btn ghost" data-act="cat-manage">Kategori</button><button class="btn primary" data-act="prod-new">'+ico('plus')+'Menu baru</button></div></div>'+(dup.length?'<div class="banner"><span><b>'+dup.length+' menu stoknya tercatat dua kali</b> (di menu dan di bahan baku), mis. '+esc(dup[0].p.name)+'.</span><button class="btn sm primary" data-act="dup-link">Hubungkan</button></div>':'')+'<div class="card flush" id="plist">'+productListHTML()+'</div>';
+  return '<div class="toolbar"><div class="toolbar-r"><input class="in search" data-in="pq" placeholder="Cari menu atau SKU" value="'+esc(S.pq)+'" aria-label="Cari menu"></div><div class="toolbar-r"><button class="btn ghost" data-act="saji-set">Pilihan menu</button><button class="btn ghost" data-act="mb-open">Ubah bahan massal</button><button class="btn ghost" data-act="cat-manage">Kategori</button><button class="btn primary" data-act="prod-new">'+ico('plus')+'Menu baru</button></div></div>'+(dup.length?'<div class="banner"><span><b>'+dup.length+' menu stoknya tercatat dua kali</b> (di menu dan di bahan baku), mis. '+esc(dup[0].p.name)+'.</span><button class="btn sm primary" data-act="dup-link">Hubungkan</button></div>':'')+'<div class="card flush" id="plist">'+productListHTML()+'</div>';
 }
 function ingTabHTML(){
   const J=S.ij||'all',n=k=>db.ingredients.filter(g=>ingJenis(g)===k).length;
@@ -2780,6 +2783,56 @@ VIEWS.menu=function(){
 ACT.mt=el=>{S.mt=el.dataset.v;render()};
 ACT['goto-ing']=()=>{closeModal();S.mt='ing';go('menu')};
 ACT['pf-mode']=el=>{S.pfMode=el.dataset.v;applyMode()};
+/* ---- salin resep dari menu lain (di dalam form menu) ---- */
+const rcSrcMenus=()=>db.products.filter(p=>p.id!==S.pfId&&(p.recipe||[]).length).sort((a,b)=>a.name.localeCompare(b.name));
+ACT['rc-copy-open']=()=>{const b=$('#rc-copy');if(b)b.hidden=!b.hidden};
+ACT['rc-copy']=el=>{
+  const src=prodById(($('#rc-src')||{}).value);if(!src){toast('Pilih menu sumber');return}
+  const rows=(src.recipe||[]).filter(r=>ingById(r.iid)).map(r=>({iid:r.iid,qty:String(r.qty)}));
+  let msg;
+  if(el.dataset.v==='rep'){S.rd.rows=rows;msg='Resep diganti dengan resep '+src.name+' ('+rows.length+' bahan)'}
+  else{const cur=S.rd.rows.filter(r=>r.iid),ada=new Set(cur.map(r=>r.iid)),baru=rows.filter(r=>!ada.has(r.iid));S.rd.rows=cur.concat(baru);
+    msg=baru.length+' bahan dari '+src.name+' ditambahkan'+(rows.length-baru.length?' · '+(rows.length-baru.length)+' sudah ada (jumlah tidak diubah)':'')}
+  if(!S.rd.rows.length)S.rd.rows.push({iid:'',qty:''});
+  $('#rc-rows').innerHTML=rcRowsHTML();rcLive();$('#rc-copy').hidden=true;toast(msg+'. Sesuaikan takarannya bila perlu');
+};
+ACT['prod-dup']=el=>{const p=prodById(el.dataset.id);if(p)prodForm(null,p)};
+/* ---- ubah bahan di banyak menu sekaligus ---- */
+function mbMenus(){return db.products.filter(p=>modeOf(p)==='recipe').sort((a,b)=>catName(a.cat).localeCompare(catName(b.cat))||a.name.localeCompare(b.name))}
+const mbUses=(p,iid)=>(p.recipe||[]).some(r=>r.iid===iid);
+function mbHTML(){
+  const M=S.mb,L=mbMenus(),ings=db.ingredients.filter(g=>g.active!==false).sort((a,b)=>a.name.localeCompare(b.name));
+  const opt=(sel,ph)=>'<option value="">'+ph+'</option>'+ings.map(g=>'<option value="'+g.id+'"'+(g.id===sel?' selected':'')+'>'+esc(g.name)+' ('+esc(g.unit)+')</option>').join('');
+  const g1=ingById(M.iid),g2=ingById(M.to);
+  const act='<div class="seg" role="group" aria-label="Jenis perubahan">'+[['add','Tambah bahan'],['rep','Ganti bahan'],['del','Hapus bahan']].map(x=>'<button type="button" class="'+(M.act===x[0]?'on':'')+'" data-act="mb-act" data-v="'+x[0]+'">'+x[1]+'</button>').join('')+'</div>';
+  let f='';
+  if(M.act==='add')f='<div class="fld-row"><div class="fld"><label class="lbl" for="mb-iid">Bahan</label><select class="sel" id="mb-iid" data-ch="mb-f" data-f="iid">'+opt(M.iid,'Pilih bahan…')+'</select></div><div class="fld"><label class="lbl" for="mb-qty">Takaran per porsi'+(g1?' ('+esc(g1.unit)+')':'')+'</label><input class="in" id="mb-qty" data-in="mb-f" data-f="qty" inputmode="decimal" value="'+esc(M.qty)+'" placeholder="0"></div></div><p class="muted help" style="margin:0">Menu yang sudah memakai bahan ini: takarannya diganti dengan angka baru.</p>';
+  if(M.act==='rep')f='<div class="fld-row"><div class="fld"><label class="lbl" for="mb-iid">Bahan lama</label><select class="sel" id="mb-iid" data-ch="mb-f" data-f="iid">'+opt(M.iid,'Pilih bahan lama…')+'</select></div><div class="fld"><label class="lbl" for="mb-to">Diganti dengan</label><select class="sel" id="mb-to" data-ch="mb-f" data-f="to">'+opt(M.to,'Pilih bahan baru…')+'</select></div></div><div class="fld"><label class="lbl" for="mb-kali">Takaran</label><div class="u-row"><span class="muted" style="white-space:nowrap">takaran lama ×</span><input class="in" id="mb-kali" data-in="mb-f" data-f="kali" inputmode="decimal" value="'+esc(M.kali)+'" style="max-width:90px"></div></div>'+(g1&&g2&&g1.unit!==g2.unit?'<p class="muted" style="margin:0;color:var(--warn)">Satuan berbeda ('+esc(g1.unit)+' → '+esc(g2.unit)+'). Sesuaikan pengali takaran.</p>':'');
+  if(M.act==='del')f='<div class="fld"><label class="lbl" for="mb-iid">Bahan yang dihapus dari resep</label><select class="sel" id="mb-iid" data-ch="mb-f" data-f="iid">'+opt(M.iid,'Pilih bahan…')+'</select></div>';
+  const rows=L.map(p=>{const u=M.iid&&mbUses(p,M.iid),r=M.iid&&(p.recipe||[]).find(x=>x.iid===M.iid);return '<label class="mb-r"><input type="checkbox" data-mbp="'+p.id+'"'+(M.sel.has(p.id)?' checked':'')+'><span><b>'+esc(p.name)+'</b><small>'+esc(catName(p.cat))+' · '+p.recipe.length+' bahan'+(u?' · <em>pakai '+esc(ingById(M.iid).name)+' '+fq(r.qty)+' '+esc(ingById(M.iid).unit)+'</em>':'')+'</small></span></label>'}).join('')||'<p class="muted">Belum ada menu dengan resep bahan baku.</p>';
+  const n=L.filter(p=>M.sel.has(p.id)).length;
+  return '<div class="form">'+act+f+'<div class="mb-h"><span class="lbl">Menu ('+n+' dipilih)</span><span style="display:flex;gap:6px;flex-wrap:wrap">'+(M.iid?'<button type="button" class="btn sm ghost" data-act="mb-pick" data-v="uses">Yang memakai bahan ini</button>':'')+'<button type="button" class="btn sm ghost" data-act="mb-pick" data-v="all">Semua</button><button type="button" class="btn sm ghost" data-act="mb-pick" data-v="none">Kosongkan</button></span></div><div class="mb-list">'+rows+'</div></div>';
+}
+const mbRender=()=>{const b=$('#mb-body');if(b)b.innerHTML=mbHTML()};
+ACT['mb-open']=()=>{S.mb={act:'add',sel:new Set(),iid:'',to:'',qty:'',kali:'1'};modal({title:'Ubah bahan di banyak menu',wide:true,body:'<div id="mb-body">'+mbHTML()+'</div>',foot:'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="mb-go">Terapkan</button>'})};
+ACT['mb-act']=el=>{S.mb.act=el.dataset.v;mbRender()};
+CH['mb-f']=el=>{S.mb[el.dataset.f]=el.value;if(el.dataset.f==='iid'&&S.mb.act!=='add'&&el.value){S.mb.sel=new Set(mbMenus().filter(p=>mbUses(p,el.value)).map(p=>p.id))}mbRender()};
+INP['mb-f']=el=>{S.mb[el.dataset.f]=el.value};
+ACT['mb-pick']=el=>{const v=el.dataset.v,L=mbMenus();S.mb.sel=new Set(v==='all'?L.map(p=>p.id):v==='uses'?L.filter(p=>mbUses(p,S.mb.iid)).map(p=>p.id):[]);mbRender()};
+document.addEventListener('change',e=>{const c=e.target.closest&&e.target.closest('[data-mbp]');if(!c||!S.mb)return;if(c.checked)S.mb.sel.add(c.dataset.mbp);else S.mb.sel.delete(c.dataset.mbp);const h=$('#mb-body .mb-h .lbl');if(h)h.textContent='Menu ('+S.mb.sel.size+' dipilih)'});
+ACT['mb-go']=()=>{
+  const M=S.mb,ps=mbMenus().filter(p=>M.sel.has(p.id)),g=ingById(M.iid);
+  if(!g){toast('Pilih bahan dulu');return}if(!ps.length){toast('Pilih minimal satu menu');return}
+  let n=0,skip=[];const r4=v=>Math.round(v*10000)/10000;
+  if(M.act==='add'){const q=dec(M.qty);if(!(q>0)){toast('Isi takaran per porsi');return}
+    ps.forEach(p=>{const r=p.recipe.find(x=>x.iid===g.id);if(r)r.qty=r4(q);else p.recipe.push({iid:g.id,qty:r4(q)});n++})}
+  if(M.act==='rep'){const t=ingById(M.to),k=dec(M.kali)||1;if(!t){toast('Pilih bahan pengganti');return}if(t.id===g.id){toast('Bahan lama dan baru sama');return}
+    ps.forEach(p=>{const r=p.recipe.find(x=>x.iid===g.id);if(!r){skip.push(p.name);return}const ex=p.recipe.find(x=>x.iid===t.id);if(ex){ex.qty=r4(ex.qty+r.qty*k);p.recipe=p.recipe.filter(x=>x!==r)}else{r.iid=t.id;r.qty=r4(r.qty*k)}n++})}
+  if(M.act==='del'){ps.forEach(p=>{if(!mbUses(p,g.id)){skip.push(p.name);return}if(p.recipe.length<=1){skip.push(p.name+' (bahan satu-satunya)');return}p.recipe=p.recipe.filter(x=>x.iid!==g.id);n++})}
+  ps.forEach(p=>{p.cost=recipeCost(p.recipe,db.ingredients)});
+  if(!n){toast('Tidak ada menu yang berubah'+(skip.length?': '+skip.slice(0,3).join(', '):''));return}
+  save();closeModal();render();toast(n+' menu diperbarui'+(skip.length?' · dilewati: '+skip.slice(0,3).join(', ')+(skip.length>3?'…':''):''));
+};
 ACT['rc-add']=()=>{S.rd.rows.push({iid:'',qty:''});$('#rc-rows').innerHTML=rcRowsHTML()};
 ACT['rc-del']=el=>{S.rd.rows.splice(+el.dataset.i,1);if(!S.rd.rows.length)S.rd.rows.push({iid:'',qty:''});$('#rc-rows').innerHTML=rcRowsHTML();rcLive()};
 CH['rc-ing']=el=>{const r=S.rd.rows[+el.dataset.i];if(r){r.iid=el.value;$('#rc-rows').innerHTML=rcRowsHTML();rcLive()}};
