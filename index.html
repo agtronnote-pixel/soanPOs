@@ -3008,24 +3008,23 @@ function receiptLayout(s,cols){
   wrapTxt(st.address,cols).forEach(x=>C(x));
   if(st.phone)C('Telp '+st.phone);
   out.push({t:SEP,a:'l'});
-  if(s.unpaid){C('TAGIHAN',{b:1});out.push({t:SEP,a:'l'});LR('Pesanan',s.no)}else LR('No',s.no);LR('Tanggal',fmtDT(s.ts));LR('Kasir',u?u.name:'-');
+  if(s.unpaid){C('SALINAN',{b:1});out.push({t:SEP,a:'l'});LR('Pesanan',s.no)}else LR('No',s.no);LR('Tanggal',fmtDT(s.ts));LR('Kasir',u?u.name:'-');
   LR('Jenis',TYPES[s.type]+(s.table?' / Meja '+s.table:''));
   if(cu)LR('Pelanggan',cu.name);
   out.push({t:SEP,a:'l'});
   s.items.forEach(i=>{W(i.name);LR('  '+i.qty+' x '+n(i.price),n(i.price*i.qty));if(i.note)W('* '+i.note,null,2)});
   out.push({t:SEP,a:'l'});
-  LR('Subtotal',n(s.subtotal));
+  if(!s.unpaid){LR('Subtotal',n(s.subtotal));
   if(s.discount)LR('Diskon','-'+n(s.discount));
   if(s.service)LR('Layanan '+s.serviceRate+'%',n(s.service));
-  if(s.tax)LR('PPN '+s.taxRate+'%',n(s.tax));
+  if(s.tax)LR('PPN '+s.taxRate+'%',n(s.tax));}
   LR('TOTAL','Rp '+n(s.total),{b:1});
   out.push({t:SEP,a:'l'});
-  if(s.unpaid)C('*** BELUM DIBAYAR ***',{b:1});
-  else{LR('Bayar ('+METHODS[s.method]+')','Rp '+n(s.paid));
+  if(!s.unpaid){LR('Bayar ('+METHODS[s.method]+')','Rp '+n(s.paid));
   if(s.method==='cash')LR('Kembali','Rp '+n(s.change));
   if(s.points)LR('Poin didapat','+'+s.points);}
   if(s.status==='void')C('*** DIBATALKAN ***',{b:1});
-  out.push({t:SEP,a:'l'});
+  if(!s.unpaid)out.push({t:SEP,a:'l'});
   wrapTxt(st.footer,cols).forEach(x=>C(x));
   return out;
 }
