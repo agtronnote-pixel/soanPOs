@@ -352,6 +352,7 @@ textarea.code{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;min-height:2
 .pbar i.warn{background:var(--warn)}.pbar i.bad{background:var(--bad)}
 .set-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:14px;align-items:start}
 .sus-bar{margin-bottom:12px;justify-content:space-between}.rk-list{max-height:34vh;overflow:auto;border-top:1px solid var(--line)}
+.rc-beda{display:flex;flex-direction:column;gap:8px}.rc-beda:empty{display:none}.rc-tabs{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.rc-tabs .seg{flex:1;min-width:200px}
 .rc-copy{display:flex;gap:8px;flex-wrap:wrap;align-items:center;padding:10px;border:1px dashed var(--line-2);border-radius:12px}.rc-copy .sel{flex:1;min-width:180px}
 .mb-h{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap}.mb-list{max-height:40vh;overflow:auto;border:1px solid var(--line);border-radius:12px;padding:4px 10px}.mb-r{display:flex;gap:10px;align-items:flex-start;padding:8px 0;border-bottom:1px solid var(--line);cursor:pointer}.mb-r:last-child{border-bottom:0}.mb-r span{display:flex;flex-direction:column;min-width:0}.mb-r small{color:var(--muted);font-size:12px}.mb-r em{font-style:normal;color:var(--ink);font-weight:600}
 .gs-sync{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
@@ -532,7 +533,7 @@ const icatName=id=>(ingCats().find(c=>c.id===id)||{}).name||'Tanpa kategori';
 const ingCat=g=>g&&g.kat&&ingCats().some(c=>c.id===g.kat)?g.kat:'';
 const LINK_L={menu:'Melekat ke menu',pesanan:'Tambahan pesanan',trx:'Per transaksi',none:'Tidak terhubung'};
 function ingLinkMap(){const m={},add=(id,t)=>{if(id&&!m[id])m[id]=t};
-  db.products.forEach(p=>{if(modeOf(p)==='recipe')(p.recipe||[]).forEach(r=>add(r.iid,'menu'));(Array.isArray(p.ukuran)?p.ukuran:[]).forEach(u=>add(u&&u.kemasan,'menu'))});
+  db.products.forEach(p=>{if(modeOf(p)==='recipe')prodRecs(p).forEach(L=>L.forEach(r=>add(r.iid,'menu')));(Array.isArray(p.ukuran)?p.ukuran:[]).forEach(u=>add(u&&u.kemasan,'menu'))});
   const sj=(db.settings&&db.settings.sajian)||{};Object.values(sj).forEach(c=>((c&&c.rec)||[]).forEach(r=>add(r.iid,'menu')));
   (db.settings.addons||[]).forEach(a=>(a.rec||[]).forEach(r=>add(r.iid,'menu')));if(db.settings.sticker)add(db.settings.sticker,'menu');
   (db.settings.perTrx||[]).forEach(r=>add(r.iid,'trx'));db.ingredients.forEach(g=>{if(g.tawar)add(g.id,'pesanan')});return m}
@@ -2114,7 +2115,7 @@ function cupMap(){
   const key=db.sales.length+'|'+db.ingredients.length+'|'+db.products.length+'|'+JSON.stringify([db.settings.sajian,db.settings.addons,db.settings.sticker]).length;
   if(CUPC&&CUPC.key===key&&Date.now()-CUPC.t<60000)return CUPC.m;
   const mx={},sum={},por={},put=(o,id,v)=>{if(id&&v>0)o[id]=Math.max(o[id]||0,v)};
-  db.products.forEach(p=>{if(modeOf(p)==='recipe')(p.recipe||[]).forEach(r=>put(mx,r.iid,+r.qty));(Array.isArray(p.ukuran)?p.ukuran:[]).forEach(u=>put(mx,u&&u.kemasan,+(u&&u.kq)||1))});
+  db.products.forEach(p=>{if(modeOf(p)==='recipe')prodRecs(p).forEach(L=>L.forEach(r=>put(mx,r.iid,+r.qty)));(Array.isArray(p.ukuran)?p.ukuran:[]).forEach(u=>put(mx,u&&u.kemasan,+(u&&u.kq)||1))});
   Object.values((db.settings&&db.settings.sajian)||{}).forEach(c=>((c&&c.rec)||[]).forEach(r=>put(mx,r.iid,+r.qty)));
   (db.settings.addons||[]).forEach(a=>(a.rec||[]).forEach(r=>put(mx,r.iid,+r.qty)));if(db.settings.sticker)put(mx,db.settings.sticker,1);
   const a=Date.now()-7*86400e3;
@@ -2174,7 +2175,7 @@ const stikerIid=()=>{const id=db.settings.sticker;return id&&ingById(id)?id:null
 function lineRec(i,type){
   const p=prodById(i.pid),m={},add=(iid,q)=>{if(!iid||!q||!ingById(iid))return;m[iid]=r3((m[iid]||0)+q)};
   const uk=prodUk(p).find(u=>u.id===i.uk),k=uk&&+uk.kali>0?+uk.kali:1;
-  if(p&&modeOf(p)==='recipe')p.recipe.forEach(r=>add(r.iid,r.qty*k));
+  if(p&&modeOf(p)==='recipe')recOf(p,i.saji).forEach(r=>add(r.iid,r.qty*k));
   const pack=[];if(uk&&uk.kemasan&&ingById(uk.kemasan))pack.push({iid:uk.kemasan,qty:+uk.kq>0?+uk.kq:1});
   if(i.saji)sajiRec(i.saji,type).forEach(r=>pack.push(r));
   pack.forEach(r=>add(r.iid,r.qty));
@@ -2194,9 +2195,10 @@ function avail(p,used,inCart){
   const md=modeOf(p);
   if(md==='stock')return{n:p.stock-(inCart||0),lim:null};
   if(md==='recipe'){
-    let n=Infinity,lim=null;
-    p.recipe.forEach(r=>{const g=ingById(r.iid);if(!g||!(r.qty>0)||g.belumCek)return;const k=Math.floor((g.stock-(used[r.iid]||0))/r.qty+1e-9);if(k<n){n=k;lim=g}});
-    return{n:n===Infinity?null:Math.max(0,n),lim};
+    /* resep Ice & Hot berbeda: menu masih bisa dijual selama salah satu sajian bisa dibuat */
+    let best=null;
+    prodRecs(p).forEach(L=>{let n=Infinity,lim=null;L.forEach(r=>{const g=ingById(r.iid);if(!g||!(r.qty>0)||g.belumCek)return;const k=Math.floor((g.stock-(used[r.iid]||0))/r.qty+1e-9);if(k<n){n=k;lim=g}});if(!best||n>best.n)best={n,lim}});
+    return{n:!best||best.n===Infinity?null:Math.max(0,best.n),lim:best?best.lim:null};
   }
   return{n:null,lim:null};
 }
@@ -2217,7 +2219,7 @@ function usageInRange(a,b){
   return m;
 }
 function dailyUse(){const t0=sod(Date.now()),u=usageInRange(addDays(t0,-7),t0);Object.keys(u).forEach(k=>{u[k]/=7});return u}
-function usedInMap(){const m={};db.products.forEach(p=>{if(modeOf(p)==='recipe')p.recipe.forEach(r=>{(m[r.iid]||(m[r.iid]=[])).push(p.name)})});return m}
+function usedInMap(){const m={};db.products.forEach(p=>{if(modeOf(p)==='recipe'){const s=new Set();prodRecs(p).forEach(L=>L.forEach(r=>s.add(r.iid)));s.forEach(id=>(m[id]||(m[id]=[])).push(p.name))}});return m}
 function coverTxt(g,rate){const r=rate[g.id]||0;if(g.stock<=0)return 'habis';if(!r)return '—';const d=g.stock/r;return d<1?'< 1 hari':d>=30?'30+ hari':Math.floor(d)+' hari'}
 const newAvgCost=(g,q,c)=>g.stock>0&&q>0?Math.round((g.stock*g.cost+q*c)/(g.stock+q)*100)/100:c;
 
@@ -2232,7 +2234,7 @@ function productListHTML(){
   if(!list.length)return empty('Menu tidak ditemukan','Ubah kata kunci atau tambah menu baru.')+thfReset('pf-reset',S.pc!=='all'||(S.pst||'all')!=='all');
   const rows=list.map(p=>{
     const md=modeOf(p),a=avail(p,{},0),mg=menuMargin(p);
-    const src=md==='recipe'?'<span class="pill amber">Resep · '+p.recipe.length+' bahan</span>':md==='stock'?'<span class="pill">Stok produk</span>':'<span class="pill">Manual</span>';
+    const src=md==='recipe'?'<span class="pill amber">Resep · '+p.recipe.length+' bahan'+(sajiBedaOn(p)?' · '+prodSaji(p).map(sajiLabel).join('/')+' beda':'')+'</span>':md==='stock'?'<span class="pill">Stok produk</span>':'<span class="pill">Manual</span>';
     const sub=a.lim?'<div class="sub">'+esc(a.lim.name)+'</div>':'';
     let av;
     if(a.n===null)av='<span class="muted">—</span>';
@@ -2270,23 +2272,50 @@ function applyMode(){
   $('#pf-manual').hidden=m==='recipe';
   if(m==='recipe')rcLive();
 }
+/* ---- resep berbeda untuk Ice & Hot (per menu, opsional) ----
+   p.sajiBeda=true + p.recipeSaji={ice:[...],hot:[...]}; p.recipe tetap diisi resep sajian pertama
+   agar tampilan & perhitungan lama tetap jalan. Pemotongan saat jual memakai resep sajian yang dipilih. */
+const sajiBedaOn=p=>!!(p&&p.sajiBeda&&p.recipeSaji&&prodSaji(p).length>1&&prodSaji(p).every(k=>Array.isArray(p.recipeSaji[k])&&p.recipeSaji[k].length));
+const recOf=(p,saji)=>sajiBedaOn(p)&&saji&&p.recipeSaji[saji]?p.recipeSaji[saji]:(p.recipe||[]);
+const prodRecs=p=>sajiBedaOn(p)?prodSaji(p).map(k=>p.recipeSaji[k]):[p.recipe||[]];
+const pfSajiOn=()=>SAJI_KEYS.filter(k=>{const c=$('[data-pfsaji="'+k+'"]');return c&&c.checked});
+function rcBedaHTML(){
+  const R=S.rd,sj=pfSajiOn();if(sj.length<2)return '';
+  const other=sj.find(k=>k!==R.tab)||sj[0];
+  return '<label class="chk"><input type="checkbox" id="rc-beda" data-act="rc-beda"'+(R.beda?' checked':'')+'>Resep berbeda untuk '+sj.map(sajiLabel).map(esc).join(' & ')+'</label>'
+   +(R.beda?'<div class="rc-tabs"><div class="seg" role="tablist">'+sj.map(k=>'<button type="button" class="'+(R.tab===k?'on':'')+'" data-act="rc-tab" data-v="'+k+'">Resep '+esc(sajiLabel(k))+'</button>').join('')+'</div><button type="button" class="btn sm ghost" data-act="rc-from" data-v="'+other+'">'+ico('copy')+'Salin dari '+esc(sajiLabel(other))+'</button></div>':'');
+}
+function rcBedaRender(){const w=$('#rc-beda-w');if(w)w.innerHTML=rcBedaHTML();const r=$('#rc-rows');if(r)r.innerHTML=rcRowsHTML();rcLive()}
+const rcClone=L=>L.map(r=>({iid:r.iid,qty:String(r.qty)}));
+ACT['rc-beda']=el=>{const R=S.rd,sj=pfSajiOn();
+  if(el.checked){R.sets={};sj.forEach(k=>R.sets[k]=R.sets0&&R.sets0[k]&&R.sets0[k].length?rcClone(R.sets0[k]):rcClone(R.rows));R.beda=true;R.tab=sj[0];R.rows=R.sets[R.tab];toast('Ubah takaran di setiap tab sesuai sajian')}
+  else{R.beda=false;R.rows=rcClone(R.rows)}
+  rcBedaRender()};
+ACT['rc-tab']=el=>{const R=S.rd;if(!R.beda)return;R.tab=el.dataset.v;R.rows=R.sets[R.tab]||(R.sets[R.tab]=[{iid:'',qty:''}]);rcBedaRender()};
+ACT['rc-from']=el=>{const R=S.rd,src=R.sets[el.dataset.v];if(!src)return;R.sets[R.tab]=rcClone(src);R.rows=R.sets[R.tab];rcBedaRender();toast('Resep '+sajiLabel(el.dataset.v)+' disalin. Sesuaikan takarannya')};
+document.addEventListener('change',e=>{if(!e.target.closest||!e.target.closest('[data-pfsaji]')||!S.rd)return;const R=S.rd,sj=pfSajiOn();
+  if(R.beda&&sj.length<2){R.beda=false;R.rows=rcClone((sj[0]&&R.sets[sj[0]])||R.rows)}
+  else if(R.beda&&!sj.includes(R.tab)){R.tab=sj[0];R.rows=R.sets[R.tab]||(R.sets[R.tab]=rcClone(R.rows))}
+  rcBedaRender()});
 function prodForm(id,tpl){
   S.pfId=id||null;
   const p=tpl?Object.assign(JSON.parse(JSON.stringify(tpl)),{name:tpl.name+' (salinan)',sku:'',stock:0}):id?prodById(id):{name:'',sku:'',cat:db.categories[0]?db.categories[0].id:'',price:'',cost:'',track:false,stock:0,min:5,active:true,recipe:[]};
   S.pfMode=id||tpl?modeOf(p):(db.ingredients.length?'recipe':'none');
-  S.rd={rows:(p.recipe||[]).map(r=>({iid:r.iid,qty:String(r.qty)}))};
+  S.rd={rows:(p.recipe||[]).map(r=>({iid:r.iid,qty:String(r.qty)})),beda:false,sets:{},tab:null,sets0:null};
+  if(p.recipeSaji)S.rd.sets0=Object.fromEntries(Object.keys(p.recipeSaji).map(k=>[k,(p.recipeSaji[k]||[]).map(r=>({iid:r.iid,qty:String(r.qty)}))]));
+  if(sajiBedaOn(p)){const sj=prodSaji(p);S.rd.beda=true;sj.forEach(k=>S.rd.sets[k]=S.rd.sets0[k]);S.rd.tab=sj[0];S.rd.rows=S.rd.sets[sj[0]]}
   S.pfx={uk:prodUk(p).map(u=>Object.assign({},u)),ad:prodAddons(p).slice(),sticker:p.sticker!==false};
   if(!S.rd.rows.length)S.rd.rows.push({iid:'',qty:''});
   const m=S.pfMode;
   const cats=db.categories.map(c=>'<option value="'+c.id+'"'+(p.cat===c.id?' selected':'')+'>'+esc(c.name)+'</option>').join('');
   const seg=[['recipe','Resep bahan baku'],['stock','Stok produk jadi'],['none','Tanpa stok']].map(x=>'<button type="button" class="'+(m===x[0]?'on':'')+'" data-act="pf-mode" data-v="'+x[0]+'">'+x[1]+'</button>').join('');
   const recipeBox=db.ingredients.length
-    ?'<div class="rc" id="pf-recipe"'+(m==='recipe'?'':' hidden')+'><div class="lbl">Resep per 1 porsi</div><div id="rc-rows" style="display:flex;flex-direction:column;gap:10px">'+rcRowsHTML()+'</div><div><button type="button" class="btn sm ghost" data-act="rc-add">'+ico('plus')+'Tambah bahan</button>'+(rcSrcMenus().length?' <button type="button" class="btn sm ghost" data-act="rc-copy-open">'+ico('copy')+'Salin dari menu…</button>':'')+'</div>'+(rcSrcMenus().length?'<div class="rc-copy" id="rc-copy" hidden><select class="sel" id="rc-src" aria-label="Menu sumber">'+rcSrcMenus().map(x=>'<option value="'+x.id+'">'+esc(x.name)+' · '+x.recipe.length+' bahan</option>').join('')+'</select><button type="button" class="btn sm ghost" data-act="rc-copy" data-v="add">Tambahkan</button><button type="button" class="btn sm ghost" data-act="rc-copy" data-v="rep">Ganti semua</button></div>':'')+'<div class="rc-sum"><div class="hpp"><span class="lbl">HPP / porsi</span><b id="rc-hpp">—</b></div><div class="hpp"><span class="lbl">Margin</span><b id="rc-mg">—</b></div><div><span class="lbl">Bisa dibuat</span><b id="rc-mk">—</b></div></div></div>'
+    ?'<div class="rc" id="pf-recipe"'+(m==='recipe'?'':' hidden')+'><div class="lbl">Resep per 1 porsi</div><div id="rc-beda-w" class="rc-beda"></div><div id="rc-rows" style="display:flex;flex-direction:column;gap:10px">'+rcRowsHTML()+'</div><div><button type="button" class="btn sm ghost" data-act="rc-add">'+ico('plus')+'Tambah bahan</button>'+(rcSrcMenus().length?' <button type="button" class="btn sm ghost" data-act="rc-copy-open">'+ico('copy')+'Salin dari menu…</button>':'')+'</div>'+(rcSrcMenus().length?'<div class="rc-copy" id="rc-copy" hidden><select class="sel" id="rc-src" aria-label="Menu sumber">'+rcSrcMenus().map(x=>'<option value="'+x.id+'">'+esc(x.name)+' · '+x.recipe.length+' bahan</option>').join('')+'</select><button type="button" class="btn sm ghost" data-act="rc-copy" data-v="add">Tambahkan</button><button type="button" class="btn sm ghost" data-act="rc-copy" data-v="rep">Ganti semua</button></div>':'')+'<div class="rc-sum"><div class="hpp"><span class="lbl">HPP / porsi</span><b id="rc-hpp">—</b></div><div class="hpp"><span class="lbl">Margin</span><b id="rc-mg">—</b></div><div><span class="lbl">Bisa dibuat</span><b id="rc-mk">—</b></div></div></div>'
     :'<div class="rc" id="pf-recipe"'+(m==='recipe'?'':' hidden')+'><b>Belum ada bahan baku</b><p class="muted">Tambahkan bahan lebih dulu agar bisa dipakai di resep.</p><div><button type="button" class="btn sm dark" data-act="goto-ing">Tambah bahan baku</button></div></div>';
   const stockBox='<div class="fld-row" id="pf-stockbox"'+(m==='stock'?'':' hidden')+'><div class="fld"><label class="lbl" for="pf-stock">'+(id?'Stok saat ini':'Stok awal')+'</label><input class="in" id="pf-stock" inputmode="numeric" value="'+esc(p.stock||0)+'"'+(id?' disabled':'')+'>'+(id?'<button type="button" class="link" data-act="prod-adj" data-id="'+id+'">Sesuaikan stok</button>':'')+'</div><div class="fld"><label class="lbl" for="pf-min">Batas stok menipis</label><input class="in" id="pf-min" inputmode="numeric" value="'+esc(p.min)+'"></div></div>';
   const manual='<div class="fld hpp" id="pf-manual"'+(m!=='recipe'?'':' hidden')+'><label class="lbl" for="pf-cost">HPP (modal) per porsi</label><input class="in" id="pf-cost" inputmode="numeric" value="'+esc(p.cost)+'"></div>';
   modal({title:tpl?'Duplikat menu':id?'Ubah menu':'Menu baru',wide:true,body:'<div class="form"><div class="fld"><label class="lbl" for="pf-name">Nama menu</label><input class="in" id="pf-name" value="'+esc(p.name)+'"></div><div class="fld-row"><div class="fld"><label class="lbl" for="pf-sku">SKU</label><input class="in" id="pf-sku" value="'+esc(p.sku)+'" placeholder="Otomatis"></div><div class="fld"><label class="lbl" for="pf-cat">Kategori</label><select class="sel" id="pf-cat">'+cats+'</select></div></div><div class="fld"><label class="lbl" for="pf-price">Harga jual</label><input class="in" id="pf-price" data-in="pf-price" inputmode="numeric" value="'+esc(p.price)+'"></div><div class="fld"><span class="lbl">Sumber HPP dan stok</span><div class="seg" role="group" aria-label="Sumber HPP dan stok">'+seg+'</div></div>'+recipeBox+stockBox+manual+'<div id="pf-x">'+pfxHTML()+'</div><div class="fld"><span class="lbl">Pilihan penyajian</span><div class="saji-opt">'+SAJI_KEYS.map(k=>'<label class="chk"><input type="checkbox" data-pfsaji="'+k+'"'+(prodSaji(p).includes(k)?' checked':'')+'>'+esc(sajiLabel(k))+'</label>').join('')+'</div></div><label class="chk"><input type="checkbox" id="pf-active"'+(p.active?' checked':'')+'>Tampilkan di kasir</label></div>',foot:(id?'<button class="btn danger" data-act="prod-del" data-id="'+id+'">Hapus</button><button class="btn ghost" data-act="prod-dup" data-id="'+id+'">'+ico('copy')+'Duplikat</button>':'')+'<button class="btn ghost" data-act="close">Batal</button><button class="btn primary" data-act="prod-save" data-id="'+(id||'')+'">Simpan</button>'});
-  rcLive();
+  rcBedaRender();
 }
 function pfxHTML(){
   const X=S.pfx,ings=db.ingredients.slice().sort((a,b)=>a.name.localeCompare(b.name)),A=db.settings.addons||[];
@@ -2310,9 +2339,12 @@ function prodSave(id){
     recipe=Object.keys(m).map(k=>({iid:k,qty:m[k]}));
     if(!recipe.length){toast('Tambahkan minimal satu bahan beserta takarannya');return}
   }
+  const toRec=rows=>{const m={};rows.forEach(r=>{const q=dec(r.qty);if(r.iid&&q>0&&ingById(r.iid))m[r.iid]=Math.round(((m[r.iid]||0)+q)*10000)/10000});return Object.keys(m).map(k=>({iid:k,qty:m[k]}))};
+  const sjOn=pfSajiOn(),beda=mode==='recipe'&&S.rd.beda&&sjOn.length>1;let recipeSaji=null;
+  if(beda){recipeSaji={};for(const k of sjOn){recipeSaji[k]=toRec(S.rd.sets[k]||[]);if(!recipeSaji[k].length){toast('Isi resep '+sajiLabel(k)+' (minimal satu bahan)');S.rd.tab=k;S.rd.rows=S.rd.sets[k]||(S.rd.sets[k]=[{iid:'',qty:''}]);rcBedaRender();return}}recipe=recipeSaji[sjOn[0]]}
   const ukuran=S.pfx.uk.map(u=>({id:u.id,label:String(u.label||'').trim().slice(0,20),price:num(u.price),kali:dec(u.kali)>0?dec(u.kali):1,kemasan:u.kemasan&&ingById(u.kemasan)?u.kemasan:'',kq:1})).filter(u=>u.label);
   if(ukuran.some(u=>!(u.price>0))){toast('Isi harga untuk setiap ukuran');return}
-  const o={ukuran,addons:$$('[data-pfad]').filter(c=>c.checked).map(c=>c.dataset.pfad),sticker:!!($('#pf-stiker')||{}).checked,sajian:SAJI_KEYS.filter(k=>{const c=$('[data-pfsaji="'+k+'"]');return c&&c.checked}),name,cat:$('#pf-cat').value,price,min:Math.max(0,num($('#pf-min').value)),active:$('#pf-active').checked,mode,recipe,track:mode==='stock'};
+  const o={sajiBeda:beda,...(recipeSaji?{recipeSaji}:{}),ukuran,addons:$$('[data-pfad]').filter(c=>c.checked).map(c=>c.dataset.pfad),sticker:!!($('#pf-stiker')||{}).checked,sajian:SAJI_KEYS.filter(k=>{const c=$('[data-pfsaji="'+k+'"]');return c&&c.checked}),name,cat:$('#pf-cat').value,price,min:Math.max(0,num($('#pf-min').value)),active:$('#pf-active').checked,mode,recipe,track:mode==='stock'};
   o.cost=mode==='recipe'?recipeCost(recipe,db.ingredients):Math.max(0,num($('#pf-cost').value));
   let sku=$('#pf-sku').value.trim();
   if(id){const p=prodById(id);if(!sku)sku=p.sku;Object.assign(p,o,{sku})}
@@ -2406,7 +2438,7 @@ function ingConvert(g,f){
   stkInit(g);g.base=mul(g.base);g.baseSum=mul(g.baseSum);Object.values(g.ctr).forEach(c=>{c.p=mul(c.p);c.n=mul(c.n)});g.stock=stkCalc(g);
   g.min=mul(g.min);g.cost=Math.round((+g.cost||0)/f*10000)/10000;
   const recs=a=>(a||[]).forEach(r=>{if(r&&r.iid===id)r.qty=mul(r.qty)});
-  db.products.forEach(p=>{recs(p.recipe);(p.ukuran||[]).forEach(u=>recs(u.rec))});
+  db.products.forEach(p=>{prodRecs(p).forEach(recs);(p.ukuran||[]).forEach(u=>recs(u.rec))});
   const sj=db.settings.sajian||{};Object.values(sj).forEach(c=>recs(c&&c.rec));
   (db.settings.addons||[]).forEach(a=>{recs(a.rec)});
   (db.invoices||[]).forEach(v=>{if(v.iid===id){v.qty=mul(v.qty)}});
@@ -2868,7 +2900,7 @@ ACT['rc-copy']=el=>{
 ACT['prod-dup']=el=>{const p=prodById(el.dataset.id);if(p)prodForm(null,p)};
 /* ---- ubah bahan di banyak menu sekaligus ---- */
 function mbMenus(){return db.products.filter(p=>modeOf(p)==='recipe').sort((a,b)=>catName(a.cat).localeCompare(catName(b.cat))||a.name.localeCompare(b.name))}
-const mbUses=(p,iid)=>(p.recipe||[]).some(r=>r.iid===iid);
+const mbUses=(p,iid)=>prodRecs(p).some(L=>L.some(r=>r.iid===iid));
 function mbHTML(){
   const M=S.mb,L=mbMenus(),ings=db.ingredients.filter(g=>g.active!==false).sort((a,b)=>a.name.localeCompare(b.name));
   const opt=(sel,ph)=>'<option value="">'+ph+'</option>'+ings.map(g=>'<option value="'+g.id+'"'+(g.id===sel?' selected':'')+'>'+esc(g.name)+' ('+esc(g.unit)+')</option>').join('');
@@ -2893,11 +2925,12 @@ ACT['mb-go']=()=>{
   const M=S.mb,ps=mbMenus().filter(p=>M.sel.has(p.id)),g=ingById(M.iid);
   if(!g){toast('Pilih bahan dulu');return}if(!ps.length){toast('Pilih minimal satu menu');return}
   let n=0,skip=[];const r4=v=>Math.round(v*10000)/10000;
+  const each=(p,fn)=>{const ok=[];if(sajiBedaOn(p))prodSaji(p).forEach(k=>{const L=p.recipeSaji[k],r=fn(L);if(r!==false){p.recipeSaji[k]=r||L;ok.push(1)}});else{const r=fn(p.recipe);if(r!==false){p.recipe=r||p.recipe;ok.push(1)}}if(sajiBedaOn(p))p.recipe=p.recipeSaji[prodSaji(p)[0]];return ok.length>0};
   if(M.act==='add'){const q=dec(M.qty);if(!(q>0)){toast('Isi takaran per porsi');return}
-    ps.forEach(p=>{const r=p.recipe.find(x=>x.iid===g.id);if(r)r.qty=r4(q);else p.recipe.push({iid:g.id,qty:r4(q)});n++})}
+    ps.forEach(p=>{if(each(p,L=>{const r=L.find(x=>x.iid===g.id);if(r)r.qty=r4(q);else L.push({iid:g.id,qty:r4(q)})}))n++})}
   if(M.act==='rep'){const t=ingById(M.to),k=dec(M.kali)||1;if(!t){toast('Pilih bahan pengganti');return}if(t.id===g.id){toast('Bahan lama dan baru sama');return}
-    ps.forEach(p=>{const r=p.recipe.find(x=>x.iid===g.id);if(!r){skip.push(p.name);return}const ex=p.recipe.find(x=>x.iid===t.id);if(ex){ex.qty=r4(ex.qty+r.qty*k);p.recipe=p.recipe.filter(x=>x!==r)}else{r.iid=t.id;r.qty=r4(r.qty*k)}n++})}
-  if(M.act==='del'){ps.forEach(p=>{if(!mbUses(p,g.id)){skip.push(p.name);return}if(p.recipe.length<=1){skip.push(p.name+' (bahan satu-satunya)');return}p.recipe=p.recipe.filter(x=>x.iid!==g.id);n++})}
+    ps.forEach(p=>{if(!mbUses(p,g.id)){skip.push(p.name);return}if(each(p,L=>{const r=L.find(x=>x.iid===g.id);if(!r)return false;const ex=L.find(x=>x.iid===t.id);if(ex){ex.qty=r4(ex.qty+r.qty*k);return L.filter(x=>x!==r)}r.iid=t.id;r.qty=r4(r.qty*k)}))n++})}
+  if(M.act==='del'){ps.forEach(p=>{if(!mbUses(p,g.id)){skip.push(p.name);return}if(prodRecs(p).some(L=>L.length<=1&&L[0]&&L[0].iid===g.id)){skip.push(p.name+' (bahan satu-satunya)');return}if(each(p,L=>L.some(x=>x.iid===g.id)?L.filter(x=>x.iid!==g.id):false))n++})}
   ps.forEach(p=>{p.cost=recipeCost(p.recipe,db.ingredients)});
   if(!n){toast('Tidak ada menu yang berubah'+(skip.length?': '+skip.slice(0,3).join(', '):''));return}
   save();closeModal();render();toast(n+' menu diperbarui'+(skip.length?' · dilewati: '+skip.slice(0,3).join(', ')+(skip.length>3?'…':''):''));
