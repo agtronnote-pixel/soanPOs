@@ -352,6 +352,7 @@ textarea.code{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;min-height:2
 .pbar i.warn{background:var(--warn)}.pbar i.bad{background:var(--bad)}
 .set-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:14px;align-items:start}
 .sus-bar{margin-bottom:12px;justify-content:space-between}.rk-list{max-height:34vh;overflow:auto;border-top:1px solid var(--line)}
+.gs-sync{display:flex;flex-direction:column;gap:8px;border-top:1px solid var(--line);padding-top:12px;margin-top:4px}
 .gs-steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:13.5px;line-height:1.45}
 .banner{display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:16px;background:var(--amber-soft);font-size:12.5px;flex-wrap:wrap}
 .banner b{font-weight:700}
@@ -3318,7 +3319,7 @@ function localApi(code){
   };
 }
 
-async function syncMakeApi(code){if(!(await localDetect()))throw Object.assign(new Error('Sinkron hanya tersedia saat aplikasi dibuka dari server lokal kedai.'),{code:'no-server'});SG.api=localApi(code);await SG.api.connect();return SG.api}
+async function syncMakeApi(code){if(SG.cfg&&SG.cfg.mode==='gs'){SG.api=gsApi(SG.cfg);await SG.api.connect();return SG.api}if(!(await localDetect()))throw Object.assign(new Error('Sinkron hanya tersedia saat aplikasi dibuka dari server lokal kedai.'),{code:'no-server'});SG.api=localApi(code);await SG.api.connect();return SG.api}
 
 /* ---- inti sinkron ---- */
 function syncRecs(d){
@@ -3357,8 +3358,8 @@ function syncListen(){
   if(SG.unsub){SG.unsub();SG.unsub=null}
   SG.unsub=SG.api.listen(SG.cfg.last||0,syncOnDocs,e=>{const m=syncErrMsg(e);syncState(/terjangkau|internet/i.test(m)?'offline':'error',m)});
 }
-function syncState(s,err){SG.state=s;if(err!==undefined)SG.err=err;const p=$('#sync-pill');if(p)p.outerHTML=syncPill();const c=$('#sync-status');if(c)c.innerHTML=syncStatusText()}
-const syncWhere=()=>'server lokal';
+function syncState(s,err){SG.state=s;if(err!==undefined)SG.err=err;const p=$('#sync-pill');if(p)p.outerHTML=syncPill();const c=$('#sync-status');if(c)c.innerHTML=syncStatusText();$$('.sync-st').forEach(x=>x.innerHTML=syncStatusText())}
+const syncWhere=()=>SG.cfg&&SG.cfg.mode==='gs'?'Google Sheet':'server lokal';
 function syncPill(){
   if(!syncOn())return '';
   const off=SG.state==='offline',bad=SG.state==='error';
@@ -3369,13 +3370,14 @@ function syncStatusText(){
   const t=SG.lastOk?' · terakhir '+fmtTime(SG.lastOk):'';
   if(SG.state==='error')return '<b style="color:var(--bad)">Gagal:</b> '+esc(SG.err||'tidak diketahui');
   if(SG.state==='offline')return 'Terputus dari '+syncWhere()+'. Perubahan disimpan di perangkat ini dan dikirim otomatis saat tersambung lagi'+t+'.';
-  if(SG.state==='live')return 'Aktif lewat '+syncWhere()+', kode toko <b>'+esc(SG.cfg.code)+'</b>'+t+'.';
+  if(SG.state==='live')return SG.cfg.mode==='gs'?'Aktif lewat Google Sheet'+t+'. Perubahan dari perangkat lain masuk ±20 detik.':'Aktif lewat '+syncWhere()+', kode toko <b>'+esc(SG.cfg.code)+'</b>'+t+'.';
   return 'Menyambung ke '+syncWhere()+'…';
 }
 function syncErrMsg(e){
   const c=(e&&e.code)||'',m=(e&&e.message)||String(e);
-  if(c==='wrong-code')return 'Kode toko salah. Gunakan kode yang sama dengan perangkat lain.';
-  if(c==='no-server')return m;
+  if(c==='wrong-code')return SG.cfg&&SG.cfg.mode==='gs'?'Kode rahasia Google Sheet salah.':'Kode toko salah. Gunakan kode yang sama dengan perangkat lain.';
+  if(c==='no-server'||c==='old-script')return m;
+  if(SG.cfg&&SG.cfg.mode==='gs'&&/unavailable|failed to fetch|network|load failed|terjangkau|internet/i.test(c+m))return 'Google Sheet tidak terjangkau. Periksa internet; perubahan dikirim otomatis saat tersambung lagi.';
   if(/unavailable|failed to fetch|network|load failed|terjangkau/i.test(c+m))return 'Server lokal tidak terjangkau. Pastikan komputer server menyala dan perangkat tersambung ke WiFi kedai.';
   return m.slice(0,160);
 }
@@ -3387,7 +3389,7 @@ function syncAfterRemote(){
   const tryR=()=>{if(busy()){SG.rTimer=setTimeout(tryR,1500);return}render()};
   tryR();
 }
-function syncSchedule(){if(!syncOn()||!SG.api)return;clearTimeout(SG.timer);SG.timer=setTimeout(syncPush,400)}
+function syncSchedule(){if(!syncOn()||!SG.api)return;clearTimeout(SG.timer);SG.timer=setTimeout(syncPush,SG.cfg.mode==='gs'?2500:400)}
 function syncPush(){
   if(!syncOn()||!SG.api)return;
   const m=syncRecs(db),ops=[];
@@ -3403,7 +3405,7 @@ function syncPush(){
 }
 async function syncStart(){
   if(!syncOn()||SG.started)return;
-  if(!(await localDetect())){SG.cfg.on=false;syncCfgSave();syncState('off','');if(S.user)render();return}
+  if(SG.cfg.mode!=='gs'&&!(await localDetect())){SG.cfg.on=false;syncCfgSave();syncState('off','');if(S.user)render();return}
   SG.started=true;
   syncState('connecting');
   try{await syncMakeApi(SG.cfg.code);syncListen();syncPush()}
@@ -3413,18 +3415,22 @@ function syncStop(){if(SG.unsub){SG.unsub();SG.unsub=null}clearTimeout(SG.retry)
 addEventListener('online',()=>{if(syncOn()){if(!SG.started)syncStart();else syncPush()}});
 
 /* salinan sheets/Code.gs (dipakai tombol Salin kode Apps Script) */
-const GS_CODE=`/* Soan Kofe POS ⇄ Google Sheets (versi 1)
+const GS_CODE=`/* Soan Kofe POS ⇄ Google Sheets (versi 2: laporan, input inventory, sinkron antar perangkat)
    Cara pasang: buka Google Sheet → Ekstensi → Apps Script → hapus isi Code.gs → tempel kode ini
    → Simpan → Terapkan (Deploy) → Deployment baru → Jenis: Aplikasi web
    → Jalankan sebagai: Saya · Yang memiliki akses: Siapa saja → Terapkan → salin URL aplikasi web ke POS.
-   Kode rahasia di bawah HARUS sama dengan yang tertulis di POS (Pengaturan → Google Sheets). */
+   Kode rahasia di bawah HARUS sama dengan yang tertulis di POS (Pengaturan → Google Sheets).
+   Memperbarui kode: tempel kode baru → Simpan → Terapkan → Kelola deployment → Edit (pensil)
+   → Versi: Versi baru → Terapkan (URL tetap sama).
+   Tab tersembunyi "_sinkron" berisi data toko untuk sinkron antar perangkat: JANGAN diedit / dihapus. */
 const KODE = '__KODE__';
 const TAB_INPUT = 'Input Inventory';
 const HEAD_INPUT = ['Tanggal', 'Nama bahan', 'Jenis', 'Jumlah', 'Satuan', 'Catatan', 'Oleh', 'Status'];
 const JENIS = ['Opname', 'Restock', 'Rusak', 'Bahan baru'];
+const TAB_SYNC = '_sinkron', POTONG = 45000; // batas isi 1 sel Google Sheets ±50.000 karakter
 
 function keluar(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
-function doGet() { return keluar({ ok: true, app: 'soan-sheet', v: 1 }); }
+function doGet() { return keluar({ ok: true, app: 'soan-sheet', v: 2 }); }
 function doPost(e) {
   let q;
   try { q = JSON.parse(e.postData.contents); } catch (x) { return keluar({ ok: false, err: 'Permintaan tidak valid' }); }
@@ -3433,10 +3439,12 @@ function doPost(e) {
   lock.waitLock(25000);
   try {
     siapkan(ss);
-    if (q.a === 'ping') return keluar({ ok: true, app: 'soan-sheet', v: 1, nama: ss.getName() });
+    if (q.a === 'ping') return keluar({ ok: true, app: 'soan-sheet', v: 2, nama: ss.getName() });
     if (q.a === 'tulis') { Object.keys(q.tab || {}).forEach(n => tulisTab(ss, n, q.tab[n])); return keluar({ ok: true }); }
     if (q.a === 'ambil') return keluar({ ok: true, rows: ambil(ss, String(q.dev || 'POS')) });
     if (q.a === 'hasil') { hasil(ss, q.rows || []); return keluar({ ok: true }); }
+    if (q.a === 'sync_get') return keluar(Object.assign({ ok: true }, syncAmbil(ss, +q.since || 0, Math.min(+q.limit || 1000, 3000))));
+    if (q.a === 'sync_put') return keluar(Object.assign({ ok: true }, syncTulis(ss, q.ops || [])));
     return keluar({ ok: false, err: 'Perintah tidak dikenal' });
   } catch (x) { return keluar({ ok: false, err: String((x && x.message) || x) }); }
   finally { lock.releaseLock(); }
@@ -3483,6 +3491,43 @@ function hasil(ss, rows) {
     sh.getRange(r.row, 8).setValue(String(r.status || ''));
     if (!sh.getRange(r.row, 1).getValue()) sh.getRange(r.row, 1).setValue(new Date());
   });
+}
+
+/* ---------- sinkron antar perangkat ----------
+   Satu baris per catatan: A kunci · B hapus (1/0) · C perangkat · D u (urutan waktu) · E jumlah potongan · F.. isi JSON.
+   Baris selalu urut menurut u (catatan yang berubah dihapus lalu ditambahkan di bawah),
+   sehingga "ambil sejak u" cukup membaca bagian bawah tab. */
+function tabSync(ss) {
+  let sh = ss.getSheetByName(TAB_SYNC);
+  if (!sh) { sh = ss.insertSheet(TAB_SYNC); sh.getRange(1, 1, 1, 6).setValues([['k', 'del', 'dev', 'u', 'n', 'j']]); sh.hideSheet(); }
+  return sh;
+}
+function syncAmbil(ss, since, limit) {
+  const sh = tabSync(ss), n = sh.getLastRow() - 1;
+  if (n < 1) return { items: [], more: false };
+  const us = sh.getRange(2, 4, n, 1).getValues().map(r => +r[0] || 0);
+  let lo = 0, hi = n; while (lo < hi) { const m = (lo + hi) >> 1; if (us[m] > since) hi = m; else lo = m + 1; }
+  if (lo >= n) return { items: [], more: false };
+  const cnt = Math.min(limit, n - lo), w = Math.max(6, sh.getLastColumn());
+  const v = sh.getRange(lo + 2, 1, cnt, w).getValues();
+  const items = v.map(r => { const p = Math.max(1, +r[4] || 1); let j = ''; for (let i = 0; i < p; i++) j += String(r[5 + i] == null ? '' : r[5 + i]); return { k: String(r[0]), del: r[1] === 1 || r[1] === true || r[1] === '1', dev: String(r[2] || ''), u: +r[3] || 0, j: r[1] === 1 || r[1] === '1' ? '' : j }; });
+  return { items, more: lo + cnt < n };
+}
+function syncTulis(ss, ops) {
+  const sh = tabSync(ss), n = sh.getLastRow() - 1, pr = PropertiesService.getScriptProperties();
+  let clock = +pr.getProperty('clock') || 0;
+  const pos = {};
+  if (n > 0) sh.getRange(2, 1, n, 1).getValues().forEach((r, i) => { pos[String(r[0])] = i + 2; });
+  const hapus = [], baru = [], seen = {};
+  ops.forEach(o => { if (!o || typeof o.k !== 'string' || !o.k) return; if (seen[o.k] != null) baru[seen[o.k]] = null; if (pos[o.k]) { hapus.push(pos[o.k]); delete pos[o.k]; }
+    clock = Math.max(Date.now(), clock + 1);
+    const j = o.del ? '' : String(o.j || ''), parts = []; for (let i = 0; i < j.length; i += POTONG) parts.push(j.slice(i, i + POTONG)); if (!parts.length) parts.push('');
+    seen[o.k] = baru.length; baru.push([o.k, o.del ? 1 : 0, String(o.dev || ''), clock, parts.length].concat(parts)); });
+  hapus.sort((a, b) => b - a).forEach(r => sh.deleteRow(r));
+  const rows = baru.filter(Boolean);
+  if (rows.length) { const w = Math.max.apply(null, rows.map(r => r.length)); sh.getRange(sh.getLastRow() + 1, 1, rows.length, w).setValues(rows.map(r => r.concat(new Array(w - r.length).fill('')))); }
+  pr.setProperty('clock', String(clock));
+  return { n: rows.length, u: clock };
 }
 `;
 /* ========== Google Sheets (lewat Google Apps Script) ==========
@@ -3588,24 +3633,71 @@ function gsCardHTML(){
     +'<p class="muted" id="gs-status" style="margin:0">'+gsStatusHTML()+'</p>'
     +'<label class="chk"><input type="checkbox" data-act="gs-mine"'+(gsMine()?' checked':'')+'>Perangkat ini mengirim laporan & memproses input</label>'
     +'<p class="muted help" style="margin:0">Centang di <b>satu</b> perangkat saja, misalnya tablet kasir. Input di tab <b>Input Inventory</b> diproses setiap ±2 menit, laporan dikirim setiap ±10 menit.</p>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" data-act="gs-now">Sinkron sekarang</button><button class="btn ghost" data-act="gs-copy">'+ico('copy')+'Salin kode Apps Script</button><button class="btn danger" data-act="gs-off">Putuskan</button></div></div></div>';
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" data-act="gs-now">Sinkron sekarang</button><button class="btn ghost" data-act="gs-copy">'+ico('copy')+'Salin kode Apps Script</button><button class="btn danger" data-act="gs-off">Putuskan</button></div>'
+    +'<div class="gs-sync"><div class="lbl">Sinkron antar perangkat</div>'
+    +(gsSyncOn()?'<p class="muted sync-st" style="margin:0">'+syncStatusText()+'</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" data-act="sync-now">Sinkron sekarang</button><button class="btn ghost" data-act="gs-share">'+ico('copy')+'Salin URL & kode untuk perangkat lain</button><button class="btn danger" data-act="gsync-off">Matikan di perangkat ini</button></div>'
+      :'<p class="muted" style="margin:0">Belum aktif di perangkat ini. Transaksi, stok, kas, dan shift dari semua perangkat bisa saling update lewat internet.</p><p class="muted help" style="margin:0">Aktifkan dulu di perangkat yang datanya paling lengkap (tablet kasir). Di HP / perangkat lain: Pengaturan → Google Sheets → isi URL & kode yang sama → Tes & hubungkan.</p><div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn primary" data-act="gsync-on">Aktifkan sinkron lewat Sheet</button><button class="btn ghost" data-act="gs-share">'+ico('copy')+'Salin URL & kode</button></div>')
+    +'</div></div></div>';
 }
+ACT['gs-share']=()=>{const c=gsCfg();copyText('Soan Kofe POS · Google Sheets\nURL: '+c.url+'\nKode rahasia: '+c.kode);toast('URL & kode disalin. Kirim ke perangkat lain secara pribadi')};
 ACT['gs-copy']=()=>{const k=(($('#gs-kode')||{}).value||gsCfg().kode||'').trim();if(k.length<8){toast('Kode rahasia minimal 8 karakter');return}copyText(GS_CODE.replace('__KODE__',k));toast('Kode Apps Script disalin. Tempel di Apps Script');};
 ACT['gs-connect']=async el=>{
   const url=$('#gs-url').value.trim(),kode=$('#gs-kode').value.trim();
   if(kode.length<8||!/^[\w-]+$/.test(kode)){toast('Kode rahasia minimal 8 karakter (huruf, angka, -)');return}
   if(!gsUrlOk(url)){toast('URL harus seperti https://script.google.com/macros/s/…/exec');$('#gs-url').focus();return}
   el.disabled=true;el.textContent='Menghubungkan…';
-  try{const j=await gsCall('ping',{},{url,kode});db.settings.gsheet={on:true,url,kode,nama:j.nama||''};lsSet(GS_DEV_KEY,'1');save();GSD=2;render();toast('Terhubung ke '+(j.nama||'Google Sheet'));setTimeout(()=>gsSync(true),300)}
+  try{const j=await gsCall('ping',{},{url,kode});let ada=false;if(+j.v>=2){try{ada=!(await gsApi({url,kode}).isEmpty())}catch(e){}}
+    db.settings.gsheet={on:true,url,kode,nama:j.nama||''};lsSet(GS_DEV_KEY,ada?'0':'1');save();GSD=2;render();toast('Terhubung ke '+(j.nama||'Google Sheet'));
+    if(ada)setTimeout(()=>ACT['gsync-on'](),400);else setTimeout(()=>gsSync(true),300)}
   catch(e){toast('Gagal: '+(e.message||'tidak bisa dihubungi'));el.disabled=false;el.textContent='Tes & hubungkan'}
 };
 ACT['gs-mine']=el=>{lsSet(GS_DEV_KEY,el.checked?'1':'0');if(el.checked){GSD=2;gsSync(true)}const s=$('#gs-status');if(s)s.innerHTML=gsStatusHTML()};
 ACT['gs-now']=async el=>{el.disabled=true;const n=await gsSync(true);el.disabled=false;if(n===0&&!gsSt().err)toast('Laporan terkirim. Tidak ada input baru')};
 ACT['gs-off']=()=>confirmBox('Putuskan Google Sheets','POS berhenti mengirim laporan dan membaca input. Isi Google Sheet tidak dihapus.','Putuskan',()=>{db.settings.gsheet={on:false,kode:gsCfg().kode||''};save();render();toast('Google Sheets diputuskan')},true);
+/* ---- sinkron antar perangkat lewat Google Sheet (tab tersembunyi _sinkron) ----
+   Antarmuka sama dengan localApi (server lokal), tetapi "listen" memakai tanya berkala:
+   ±20 detik saat aplikasi terbuka, ±60 detik saat di latar belakang. */
+function gsApi(cfg){
+  const cc={url:cfg.url,kode:cfg.kode||cfg.code};
+  const call=(a,o)=>gsCall(a,o,cc).catch(e=>{if(/kode rahasia salah/i.test(e.message))throw Object.assign(e,{code:'wrong-code'});if(/failed to fetch|network|load failed/i.test(e.message))throw Object.assign(new Error('Google Sheet tidak terjangkau'),{code:'unavailable'});throw e});
+  const get=async since=>{let all=[],s=since,more=true;while(more){const j=await call('sync_get',{since:s,limit:1000});all=all.concat(j.items||[]);more=!!j.more&&(j.items||[]).length>0;if(j.items&&j.items.length)s=j.items[j.items.length-1].u}return all};
+  return{
+    async connect(){const j=await call('ping');if(!(+j.v>=2))throw Object.assign(new Error('Kode Apps Script masih versi lama. Salin kode Apps Script terbaru, tempel, lalu Terapkan → Kelola deployment → Versi baru.'),{code:'old-script'})},
+    async isEmpty(){const j=await call('sync_get',{since:0,limit:1});return !(j.items||[]).length},
+    getAll:()=>get(0),
+    listen(sinceMs,onDocs,onErr){
+      let dead=false,t=null,first=true;
+      const tick=async()=>{if(dead)return;
+        if(navigator.onLine===false){onErr(Object.assign(new Error('Tidak ada internet'),{code:'unavailable'}));t=setTimeout(tick,20e3);return}
+        try{const l=await get(SG.cfg.last||sinceMs||0);if(dead)return;onDocs(l);if(first){first=false;syncPush()}}
+        catch(e){if(!dead)onErr(e)}
+        if(!dead)t=setTimeout(tick,document.hidden?60e3:20e3)};
+      tick();
+      const vis=()=>{if(!document.hidden&&!dead){clearTimeout(t);t=setTimeout(tick,500)}};document.addEventListener('visibilitychange',vis);
+      return()=>{dead=true;clearTimeout(t);document.removeEventListener('visibilitychange',vis)};
+    },
+    async write(ops){
+      const L=ops.map(o=>({k:o.k,j:o.del?'':o.j,del:!!o.del,dev:SG.cfg.dev}));
+      for(let i=0;i<L.length;){let n=0,sz=0;while(i+n<L.length&&n<400&&sz<1.5e6){sz+=(L[i+n].j||'').length+80;n++}await call('sync_put',{ops:L.slice(i,i+n)});i+=n}
+      return {ok:true};
+    }
+  };
+}
+const gsSyncOn=()=>syncOn()&&SG.cfg.mode==='gs';
+/* aktifkan sinkron lewat Sheet di perangkat ini (memakai URL & kode Google Sheets) */
+ACT['gsync-on']=async el=>{
+  const c=gsCfg();if(!gsReady()){toast('Hubungkan Google Sheets dulu');return}
+  if(syncOn()&&SG.cfg.mode!=='gs'){toast('Perangkat ini sedang sinkron lewat server lokal. Matikan dulu di Pengaturan → Sinkron');return}
+  if(el){el.disabled=true;el.textContent='Memeriksa…'}
+  SG.cfg={on:false,mode:'gs',url:c.url,code:c.kode,dev:(SG.cfg&&SG.cfg.dev)||'d-'+uid(),last:0};
+  try{SG.api=gsApi(SG.cfg);await SG.api.connect();await syncJoin()}
+  catch(e){SG.cfg.on=false;syncCfgSave();SG.api=null;toast(syncErrMsg(e));if(el){el.disabled=false;el.textContent='Aktifkan sinkron lewat Sheet'}}
+};
+ACT['gsync-off']=()=>ACT['sync-off']();
 /* ---- tampilan di Pengaturan ---- */
 function syncCardHTML(){
   const on=syncOn(),local=SG.mode==='local';
-  if(!local&&!on)return '<div class="card"><div class="card-h"><h3>Sinkron antar perangkat</h3></div><div class="form"><p class="muted">Mati. Data hanya ada di perangkat ini.</p><p class="muted help">Untuk menyinkronkan tablet, laptop, dan HP, buka aplikasi dari <b>Server Lokal Soan Kofe</b> di komputer kedai (alamat seperti http://192.168.1.10:8080). Sinkron, berkas, dan laporan CSV tersedia di sana.</p></div></div>';
+  if(!local&&!on)return '<div class="card"><div class="card-h"><h3>Sinkron antar perangkat</h3></div><div class="form"><p class="muted">Mati. Data hanya ada di perangkat ini.</p><p class="muted help">Untuk menyinkronkan tablet, laptop, dan HP, buka aplikasi dari <b>Server Lokal Soan Kofe</b> di komputer kedai (alamat seperti http://192.168.1.10:8080). Sinkron, berkas, dan laporan CSV tersedia di sana.</p><p class="muted" style="margin:0">Tanpa server lokal: sinkron lewat internet di <b>Google Sheets</b> (kartu di bawah).</p></div></div>';
   return '<div class="card"><div class="card-h"><h3>Sinkron antar perangkat</h3>'+(on?'<span class="pill ok">Aktif</span>':'<span class="pill amber">Server lokal</span>')+'</div><div class="form">'
    +'<p class="muted" id="sync-status">'+syncStatusText()+'</p>'
    +(on?'<button class="btn ghost" data-act="sync-now">Sinkron sekarang</button><button class="btn danger" data-act="sync-off">Matikan sinkron di perangkat ini</button>'
@@ -3620,39 +3712,43 @@ ACT['sync-go']=async el=>{
   SG.cfg={on:false,code,dev:(SG.cfg&&SG.cfg.dev)||'d-'+uid(),last:0};
   try{
     await syncMakeApi(code);SG.cfg.mode=SG.mode;
-    if(await SG.api.isEmpty()){
-      confirmBox('Jadikan data awal toko','Kode ini masih kosong di '+syncWhere()+'. Data di perangkat ini ('+db.sales.length+' transaksi, '+db.products.length+' produk) akan diunggah menjadi data toko, lalu perangkat lain cukup memakai kode yang sama.','Unggah data ini',()=>{
-        SG.base={};syncBaseSave();SG.cfg.on=true;SG.cfg.last=0;syncCfgSave();SG.started=true;syncListen();syncPush();render();toast('Sinkron aktif. Data sedang diunggah.');
-      },false);
-    }else{
-      confirmBox('Ambil data toko','Kode ini sudah berisi data toko. Data di perangkat ini akan <b>diganti</b> dengan data dari '+syncWhere()+'. Data lama disimpan dulu sebagai cadangan otomatis di Pengaturan, bagian Data.','Ambil data toko',async()=>{
-        toast('Mengunduh data toko…');
-        try{
-          const all=await SG.api.getAll();
-          snapshotNow('Sebelum sinkron pertama');
-          const keep=db.settings;
-          db={v:2,settings:keep,users:[],categories:[],products:[],customers:[],sales:[],held:[],stockLog:[],ingredients:[],ingLog:[],shifts:[],cashLog:[],seq:{sale:0},demo:false};
-          SG.base={};let max=0;
-          all.forEach(v=>{if(v.u>max)max=v.u;if(!v.del)syncApply(v)});
-          migrate(db);if(!db.users.length){db=JSON.parse(lsGet(SNAP_KEY));throw new Error('Data toko di server tidak lengkap')}
-          SG.cfg.on=true;SG.cfg.last=max;syncCfgSave();syncBaseSave();lsSet(LS_KEY,JSON.stringify(db));
-          SG.started=true;syncListen();resetPos();
-          if(S.user){const u=userById(S.user.id);if(u)S.user=u;else{logout();toast('Data toko dimuat. Silakan masuk lagi.');return}}
-          render();toast('Sinkron aktif. Data toko dimuat.');
-        }catch(e){SG.cfg.on=false;syncCfgSave();syncState('error',syncErrMsg(e));toast(syncErrMsg(e))}
-      },false);
-    }
+    await syncJoin();
   }catch(e){closeModal();SG.cfg.on=false;syncCfgSave();toast(syncErrMsg(e))}
 };
+async function syncJoin(){
+    if(await SG.api.isEmpty()){
+    confirmBox('Jadikan data awal toko','Kode ini masih kosong di '+syncWhere()+'. Data di perangkat ini ('+db.sales.length+' transaksi, '+db.products.length+' produk) akan diunggah menjadi data toko, lalu perangkat lain cukup memakai kode yang sama.','Unggah data ini',()=>{
+      SG.base={};syncBaseSave();SG.cfg.on=true;SG.cfg.last=0;syncCfgSave();SG.started=true;syncListen();syncPush();render();toast('Sinkron aktif. Data sedang diunggah.');
+    },false);
+  }else{
+    confirmBox('Ambil data toko','Kode ini sudah berisi data toko. Data di perangkat ini akan <b>diganti</b> dengan data dari '+syncWhere()+'. Data lama disimpan dulu sebagai cadangan otomatis di Pengaturan, bagian Data.','Ambil data toko',async()=>{
+      toast('Mengunduh data toko…');
+      try{
+        const all=await SG.api.getAll();
+        snapshotNow('Sebelum sinkron pertama');
+        const keep=db.settings;
+        db={v:2,settings:keep,users:[],categories:[],products:[],customers:[],sales:[],held:[],stockLog:[],ingredients:[],ingLog:[],shifts:[],cashLog:[],seq:{sale:0},demo:false};
+        SG.base={};let max=0;
+        all.forEach(v=>{if(v.u>max)max=v.u;if(!v.del)syncApply(v)});
+        migrate(db);if(!db.users.length){db=JSON.parse(lsGet(SNAP_KEY));throw new Error('Data toko di server tidak lengkap')}
+        SG.cfg.on=true;SG.cfg.last=max;syncCfgSave();syncBaseSave();lsSet(LS_KEY,JSON.stringify(db));
+        SG.started=true;syncListen();resetPos();
+        if(S.user){const u=userById(S.user.id);if(u)S.user=u;else{logout();toast('Data toko dimuat. Silakan masuk lagi.');return}}
+        render();toast('Sinkron aktif. Data toko dimuat.');
+      }catch(e){SG.cfg.on=false;syncCfgSave();syncState('error',syncErrMsg(e));toast(syncErrMsg(e))}
+    },false);
+  }
+}
 ACT['sync-now']=()=>{if(!SG.started)syncStart();else{syncPush();syncListen()}toast('Menyinkronkan…')};
 ACT['sync-off']=()=>confirmBox('Matikan sinkron','Perangkat ini berhenti menerima dan mengirim perubahan. Data yang sudah ada tetap tersimpan di perangkat ini.','Matikan',()=>{SG.cfg.on=false;syncCfgSave();syncStop();render();toast('Sinkron dimatikan di perangkat ini')});
 
 /* ---- berkas & laporan (hanya server lokal) ---- */
 const FOLDER_LBL={laporan:'Laporan CSV',gambar:'Gambar',dokumen:'Dokumen'};
-const fileCode=()=>syncOn()?SG.cfg.code:'';
+const fileCode=()=>syncOn()&&SG.cfg.mode!=='gs'?SG.cfg.code:'';
 const fileUrl=(f,dl)=>'files/'+encodeURIComponent(f.folder)+'/'+encodeURIComponent(f.name)+'?code='+encodeURIComponent(fileCode())+(dl?'&dl=1':'');
 const fmtSize=n=>n<1024?n+' B':n<1048576?(n/1024).toFixed(0)+' KB':(n/1048576).toFixed(1)+' MB';
 function filesCardHTML(){
+  if(SG.cfg&&SG.cfg.mode==='gs')return '';
   if(!syncOn())return '<div class="card"><div class="card-h"><h3>Berkas &amp; laporan</h3></div><p class="muted">Aktifkan sinkron dulu untuk menyimpan gambar, dokumen, dan laporan CSV di server kedai.</p></div>';
   return '<div class="card"><div class="card-h"><h3>Berkas &amp; laporan</h3><button class="btn sm ghost" data-act="files-refresh">Muat ulang</button></div><div class="form">'
    +'<h4 style="margin:0 0 4px">Cadangan</h4><div id="bk-status">'+backupStatusHTML()+'</div>'

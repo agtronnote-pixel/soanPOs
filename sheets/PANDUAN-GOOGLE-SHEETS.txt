@@ -3,6 +3,8 @@ SOAN KOFE POS × GOOGLE SHEETS
 
 Apa gunanya
 -----------
+0. Sinkron antar perangkat lewat internet (tanpa Server Lokal): transaksi, stok, kas, shift,
+   menu, pengguna — tablet, HP, laptop saling update ±20 detik (lihat bagian D).
 1. Input inventory dari Google Sheet (HP/laptop mana saja, lewat internet):
    tab "Input Inventory" → diproses POS → stok berubah & tercatat di mutasi stok.
 2. Laporan otomatis ke Google Sheet:
@@ -68,5 +70,23 @@ C. BATASAN
 - Perlu internet di perangkat yang memproses. Tanpa internet POS tetap berjalan;
   input & laporan menyusul saat online.
 - Sinkron tidak seketika: input ±2 menit, laporan ±10 menit (lebih cepat setelah tutup shift).
-- Tahap ini belum menyinkronkan transaksi/kas antar perangkat lewat Sheet.
-  Untuk sinkron real-time antar perangkat tetap pakai Server Lokal.
+- Sinkron lewat Sheet ±20 detik (bukan seketika). Server Lokal tetap paling cepat bila semua
+  perangkat di WiFi kedai yang sama. Pakai salah satu saja di setiap perangkat.
+
+
+D. SINKRON ANTAR PERANGKAT LEWAT SHEET
+--------------------------------------
+1. Perbarui kode Apps Script ke versi 2 (bila memasang sebelum fitur ini):
+   POS → Pengaturan → Google Sheets → "Salin kode Apps Script" → tempel di Apps Script → Simpan
+   → Terapkan → Kelola deployment → Edit (pensil) → Versi: Versi baru → Terapkan.
+2. Di perangkat yang datanya paling lengkap (tablet kasir):
+   Pengaturan → Google Sheets → "Aktifkan sinkron lewat Sheet" → "Unggah data ini".
+3. Di HP / laptop lain: Pengaturan → Google Sheets → isi URL & kode rahasia yang sama
+   (tombol "Salin URL & kode" di tablet, kirim secara pribadi) → "Tes & hubungkan"
+   → "Ambil data toko". Data di perangkat itu diganti data toko (data lama dicadangkan otomatis).
+4. Selesai. Semua perangkat saling update ±20 detik saat aplikasi terbuka.
+   Tanpa internet tetap bisa berjualan; perubahan dikirim otomatis saat online.
+   Stok yang berkurang di dua perangkat sekaligus digabung dengan benar (tidak saling menimpa).
+
+Data sinkron tersimpan di tab tersembunyi "_sinkron". JANGAN diedit, diurutkan, atau dihapus.
+Laporan & input tetap diproses oleh satu "perangkat yang memproses" saja.
