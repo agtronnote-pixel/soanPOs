@@ -3338,9 +3338,9 @@ async function shareReceiptImg(s,name){
     try{await navigator.share({files:[file],title:text,text});return}catch(e){if(e&&e.name==='AbortError')return}
   }
   /* perangkat tanpa fitur bagikan berkas (mis. laptop): simpan gambar, lalu buka WhatsApp */
+  toast('Gambar struk disimpan. Lampirkan di WhatsApp');
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=fn;document.body.appendChild(a);a.click();setTimeout(()=>{URL.revokeObjectURL(a.href);a.remove()},4000);
   const ph=cu&&String(cu.phone||'').replace(/\D/g,'').replace(/^0/,'62');
-  toast('Gambar struk disimpan. Lampirkan di WhatsApp');
   if(ph&&ph.length>=9)setTimeout(()=>window.open('https://wa.me/'+ph+'?text='+encodeURIComponent(text),'_blank','noopener'),600);
 }
 ACT['wa-receipt']=el=>{const s=db.sales.find(x=>x.id===el.dataset.id);if(s)shareReceiptImg(s,s.no)};
