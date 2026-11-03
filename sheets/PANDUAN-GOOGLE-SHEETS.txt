@@ -1,0 +1,72 @@
+SOAN KOFE POS × GOOGLE SHEETS
+=============================
+
+Apa gunanya
+-----------
+1. Input inventory dari Google Sheet (HP/laptop mana saja, lewat internet):
+   tab "Input Inventory" → diproses POS → stok berubah & tercatat di mutasi stok.
+2. Laporan otomatis ke Google Sheet:
+   tab "Stok Bahan", "Laporan Harian" (60 hari), "Mutasi Stok" (300 terakhir).
+POS tetap sumber data utama. Tab laporan ditulis ulang oleh POS, jadi jangan diedit
+(perubahan di sana akan tertimpa). Yang diisi manual hanya tab "Input Inventory".
+
+
+A. PEMASANGAN (sekali saja, ±5 menit, dari laptop lebih mudah)
+--------------------------------------------------------------
+1. Buka Google Drive → Baru → Google Spreadsheet. Beri nama, mis. "Soan Kofe Data".
+2. Di POS: Pengaturan → Google Sheets → ketuk "Salin kode Apps Script".
+   (Kode rahasia sudah terisi otomatis di dalam kode tersebut.)
+3. Di Google Sheet: Ekstensi → Apps Script. Hapus semua isi Code.gs, tempel kode tadi,
+   lalu Simpan (ikon disket).
+4. Terapkan (Deploy) → Deployment baru → ikon roda gigi → Aplikasi web.
+     Jalankan sebagai      : Saya
+     Yang memiliki akses   : Siapa saja
+   → Terapkan → Izinkan akses (pilih akun Google Anda → Lanjutan → Buka … → Izinkan).
+5. Salin "URL aplikasi web" (berakhiran /exec), tempel di POS kolom "URL aplikasi web",
+   lalu ketuk "Tes & hubungkan".
+6. Selesai. Tab "Input Inventory" dan tab laporan muncul di Sheet dalam ±1 menit.
+
+Catatan:
+- "Siapa saja" artinya alamat itu bisa dipanggil tanpa login Google, tetapi tetap
+  butuh KODE RAHASIA. Jangan bagikan kode dan URL ke orang lain.
+- Perangkat yang dipakai menghubungkan otomatis menjadi "perangkat yang memproses".
+  Di perangkat lain, pengaturan ikut tersinkron tetapi tidak memproses (supaya tidak dobel).
+  Pindahkan dengan mencentang "Perangkat ini mengirim laporan & memproses input".
+- Mengubah kode Apps Script nanti: Terapkan → Kelola deployment → Edit (pensil)
+  → Versi: Versi baru → Terapkan. URL tetap sama.
+
+
+B. INPUT INVENTORY LEWAT SHEET
+------------------------------
+Isi satu baris per bahan di tab "Input Inventory":
+
+  Tanggal | Nama bahan | Jenis | Jumlah | Satuan | Catatan | Oleh | Status
+  (boleh  | sama dengan| pilih | angka  | boleh  | bebas   | nama | DIISI
+   kosong)| nama di POS|       |        | kosong |         |      | SISTEM
+
+Jenis:
+  Opname      → stok diganti dengan hasil hitung (Jumlah = stok sebenarnya)
+  Restock     → stok ditambah Jumlah
+  Rusak       → stok dikurangi Jumlah (tumpah, basi, rusak)
+  Bahan baru  → membuat bahan baru dengan stok awal = Jumlah, satuan dari kolom Satuan
+
+Satuan: kosongkan untuk memakai satuan bahan di POS (mis. gr / ml / pcs).
+        Bisa juga satuan kemasan yang terdaftar (mis. kotak, bag) atau kg / L.
+
+Dalam ±2 menit kolom Status terisi:
+  ✓ Biji Espresso Blend 4.200 → 1.250 g        (berhasil)
+  ✗ Bahan tidak ditemukan                       (periksa ejaan nama bahan)
+  ✗ Satuan "…" tidak cocok (pakai g)            (perbaiki satuan)
+Baris ✗ bisa diperbaiki lalu kolom Status DIKOSONGKAN agar diproses ulang.
+Baris yang sudah ✓ tidak akan diproses dua kali.
+
+Tombol "Sinkron sekarang" di POS memproses input dan mengirim laporan saat itu juga.
+
+
+C. BATASAN
+----------
+- Perlu internet di perangkat yang memproses. Tanpa internet POS tetap berjalan;
+  input & laporan menyusul saat online.
+- Sinkron tidak seketika: input ±2 menit, laporan ±10 menit (lebih cepat setelah tutup shift).
+- Tahap ini belum menyinkronkan transaksi/kas antar perangkat lewat Sheet.
+  Untuk sinkron real-time antar perangkat tetap pakai Server Lokal.

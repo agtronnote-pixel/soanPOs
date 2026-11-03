@@ -13,6 +13,7 @@ semua teks aplikasi, pesan commit, komentar Issue/PR ditulis dalam **bahasa Indo
   (penyimpanan hanya di memori) untuk pratinjau panel.
 - `server/server.js` — Server Lokal (Node.js, tanpa paket tambahan): sinkron real-time (SSE),
   berkas, laporan CSV, cadangan Google Drive & .zip. Lihat `server/PANDUAN.txt`.
+- `sheets/Code.gs` — jembatan Google Apps Script untuk Google Sheets (salinannya ada di `GS_CODE` di index.html, harus sama persis). Panduan: `sheets/PANDUAN-GOOGLE-SHEETS.txt`.
 - Situs dipublikasikan oleh GitHub Pages dari branch `main`.
 
 ## Aturan data (WAJIB, data toko asli tersimpan di perangkat dan server)
@@ -20,6 +21,7 @@ semua teks aplikasi, pesan commit, komentar Issue/PR ditulis dalam **bahasa Indo
 - Perubahan struktur data harus lewat fungsi `migrate(d)` dan aman untuk data lama; jangan hapus field yang ada.
 - Jangan ubah format catatan sinkron `{k, j, del, u, dev}` atau API server (`/api/items`, `/api/stream`, `/api/files`, `/api/backup.zip`) tanpa tetap kompatibel dengan versi lama.
 - Jangan menambah layanan pihak ketiga (Firebase, analytics, CDN baru) kecuali diminta jelas di Issue.
+  Pengecualian yang sudah disetujui pemilik (3 Nov 2026): Google Sheets lewat Google Apps Script milik toko.
 
 ## Cara kerja
 - Ikuti gaya kode yang ada (fungsi kecil, `ACT[...]` untuk aksi tombol, `VIEWS[...]` untuk halaman, `esc()` untuk teks pengguna).

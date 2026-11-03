@@ -352,6 +352,7 @@ textarea.code{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;min-height:2
 .pbar i.warn{background:var(--warn)}.pbar i.bad{background:var(--bad)}
 .set-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:14px;align-items:start}
 .sus-bar{margin-bottom:12px;justify-content:space-between}.rk-list{max-height:34vh;overflow:auto;border-top:1px solid var(--line)}
+.gs-steps{margin:0;padding-left:20px;display:flex;flex-direction:column;gap:6px;font-size:13.5px;line-height:1.45}
 .banner{display:flex;gap:12px;align-items:center;padding:12px 16px;border-radius:16px;background:var(--amber-soft);font-size:12.5px;flex-wrap:wrap}
 .banner b{font-weight:700}
 
@@ -650,7 +651,7 @@ function seed(){
 let db=null;
 const SNAP_KEY=LS_KEY+'.snap',SNAP_META=LS_KEY+'.snapmeta';
 function snapshotNow(label){lsSet(SNAP_KEY,JSON.stringify(db));lsSet(SNAP_META,JSON.stringify({ts:Date.now(),label}))}
-function save(){CUPC=null;
+function save(){CUPC=null;if(typeof GSD!=='undefined')GSD=Math.max(GSD,1);
   try{
     let m=null;try{m=JSON.parse(lsGet(SNAP_META)||'null')}catch(e){}
     const today=new Date().toDateString();
@@ -852,7 +853,7 @@ const PARTS={
   shift:{t:'Shift',o:[['aktif','Shift berjalan'],['riwayat','Riwayat shift']],f:[['b-rekap','Tombol Rekap'],['b-lapor','Tombol Lapor grup'],['b-kas','Tombol Kas masuk / keluar']]},
   finance:{t:'Keuangan',o:[['kpi','Saldo Drawer & Dompet'],['aksi','Tombol aksi kas'],['invoice','Invoice belum dibayar'],['jurnal','Jurnal kas tunai'],['rincian','Rincian pengeluaran'],['rekap','Rekap penjualan per shift']]},
   inventory:{t:'Inventory',o:[['cek','Tab Cek & sesuaikan stok',1],['log','Tab Riwayat mutasi',1]],f:[['kpi','Ringkasan angka']]},
-  settings:{t:'Pengaturan',o:[['profil','Profil toko'],['pajak','Pajak, layanan, poin, stok'],['pengguna','Pengguna'],['dev','Mode Developer'],['wa','Laporan grup WhatsApp'],['sync','Sinkron'],['tampil','Tampilan'],['printer','Printer struk'],['data','Data']]}
+  settings:{t:'Pengaturan',o:[['profil','Profil toko'],['pajak','Pajak, layanan, poin, stok'],['pengguna','Pengguna'],['dev','Mode Developer'],['wa','Laporan grup WhatsApp'],['sync','Sinkron'],['gsheet','Google Sheets'],['tampil','Tampilan'],['printer','Printer struk'],['data','Data']]}
 };
 const PART_LOCK={settings:['dev']};
 function partCfg(pg){const o=uiOv(),b=(o&&o.bagian&&o.bagian[pg])||(UI.bagian&&UI.bagian[pg]);return Array.isArray(b)?b:[]}
@@ -2083,6 +2084,7 @@ VIEWS.settings=function(){
    dev:devCardHTML(),
    wa:fiturOn('wa')?waCardHTML():'',
    sync:syncCardHTML(),
+   gsheet:gsCardHTML(),
    tampil:'<div class="card"><div class="card-h"><h3>Tampilan</h3></div><label class="chk"><input type="checkbox" data-act="ringkas-tog"'+(ringkasOn()?'':' checked')+'>Tampilkan teks bantuan</label><p class="muted help" style="margin:8px 0 0">Berlaku di perangkat ini.</p></div>',
    printer:printerCardHTML(),
    data:'<div class="card"><div class="card-h"><h3>Data</h3><span class="muted" data-appver></span></div><div class="form">'+storageStatusHTML()+'<button class="btn ghost" data-act="backup">Cadangkan data</button>'+snapBtn()+'<button class="btn ghost" data-act="restore">Pulihkan dari cadangan</button><button class="btn danger" data-act="clear-demo">Hapus transaksi &amp; pelanggan contoh</button><button class="btn danger" data-act="reset-demo">Reset ke data contoh</button></div></div>'})+'</div>';
@@ -3054,6 +3056,7 @@ ACT['shift-close-go']=()=>{
   Object.assign(sh,{closeTs:Date.now(),closeCash:c,expectedCash:exp,diff:c-exp,note:$('#sc-note').value.trim()});
   if(sh.dompetOpen!=null&&cashOn()){sh.dompetClose=cashBal().dompet;if(c!==exp)cashEntry('drawer',c>exp?'debit':'kredit',Math.abs(c-exp),'Selisih hitung tutup shift ('+(c>exp?'lebih':'kurang')+')',{ref:sh.id})}
   save();closeModal();render();toast('Shift ditutup');recapModal(sh);
+  if(typeof gsSync==='function'){GSD=2;setTimeout(()=>gsSync(false),2500)}
   if(waCfg().on&&waCfg().tutup)setTimeout(()=>waAsk('Shift ditutup','Kirim kartu rekap penjualan & kondisi kas (Drawer/Dompet) ke grup '+waCfg().grup+'?','tutup',sh.id),600);
 };
 /* kasir */
@@ -3409,6 +3412,196 @@ async function syncStart(){
 function syncStop(){if(SG.unsub){SG.unsub();SG.unsub=null}clearTimeout(SG.retry);SG.started=false;SG.api=null;syncState('off','')}
 addEventListener('online',()=>{if(syncOn()){if(!SG.started)syncStart();else syncPush()}});
 
+/* salinan sheets/Code.gs (dipakai tombol Salin kode Apps Script) */
+const GS_CODE=`/* Soan Kofe POS ⇄ Google Sheets (versi 1)
+   Cara pasang: buka Google Sheet → Ekstensi → Apps Script → hapus isi Code.gs → tempel kode ini
+   → Simpan → Terapkan (Deploy) → Deployment baru → Jenis: Aplikasi web
+   → Jalankan sebagai: Saya · Yang memiliki akses: Siapa saja → Terapkan → salin URL aplikasi web ke POS.
+   Kode rahasia di bawah HARUS sama dengan yang tertulis di POS (Pengaturan → Google Sheets). */
+const KODE = '__KODE__';
+const TAB_INPUT = 'Input Inventory';
+const HEAD_INPUT = ['Tanggal', 'Nama bahan', 'Jenis', 'Jumlah', 'Satuan', 'Catatan', 'Oleh', 'Status'];
+const JENIS = ['Opname', 'Restock', 'Rusak', 'Bahan baru'];
+
+function keluar(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
+function doGet() { return keluar({ ok: true, app: 'soan-sheet', v: 1 }); }
+function doPost(e) {
+  let q;
+  try { q = JSON.parse(e.postData.contents); } catch (x) { return keluar({ ok: false, err: 'Permintaan tidak valid' }); }
+  if (!q || q.kode !== KODE) return keluar({ ok: false, err: 'Kode rahasia salah' });
+  const ss = SpreadsheetApp.getActiveSpreadsheet(), lock = LockService.getScriptLock();
+  lock.waitLock(25000);
+  try {
+    siapkan(ss);
+    if (q.a === 'ping') return keluar({ ok: true, app: 'soan-sheet', v: 1, nama: ss.getName() });
+    if (q.a === 'tulis') { Object.keys(q.tab || {}).forEach(n => tulisTab(ss, n, q.tab[n])); return keluar({ ok: true }); }
+    if (q.a === 'ambil') return keluar({ ok: true, rows: ambil(ss, String(q.dev || 'POS')) });
+    if (q.a === 'hasil') { hasil(ss, q.rows || []); return keluar({ ok: true }); }
+    return keluar({ ok: false, err: 'Perintah tidak dikenal' });
+  } catch (x) { return keluar({ ok: false, err: String((x && x.message) || x) }); }
+  finally { lock.releaseLock(); }
+}
+/* tab Input Inventory dibuat otomatis bila belum ada */
+function siapkan(ss) {
+  if (ss.getSheetByName(TAB_INPUT)) return;
+  const sh = ss.insertSheet(TAB_INPUT, 0);
+  sh.getRange(1, 1, 1, HEAD_INPUT.length).setValues([HEAD_INPUT]).setFontWeight('bold');
+  sh.setFrozenRows(1);
+  sh.getRange('C2:C').setDataValidation(SpreadsheetApp.newDataValidation().requireValueInList(JENIS, true).setAllowInvalid(false).build());
+  sh.setColumnWidth(2, 200); sh.setColumnWidth(8, 280);
+}
+/* tab laporan dari POS (Stok Bahan, Laporan Harian, Mutasi Stok): isinya diganti setiap kiriman */
+function tulisTab(ss, nama, t) {
+  if (nama === TAB_INPUT || !t || !Array.isArray(t.head)) return;
+  const sh = ss.getSheetByName(nama) || ss.insertSheet(nama);
+  sh.clearContents();
+  const rows = [t.head].concat(t.rows || []).map(r => t.head.map((_, i) => (r[i] == null ? '' : r[i])));
+  sh.getRange(1, 1, rows.length, t.head.length).setValues(rows);
+  sh.getRange(1, 1, 1, t.head.length).setFontWeight('bold');
+  sh.setFrozenRows(1);
+  if (t.catatan) sh.getRange(1, t.head.length + 2).setValue(t.catatan);
+}
+/* ambil baris input yang belum diproses; ditandai ⏳ agar tidak diproses dua kali oleh perangkat lain */
+function ambil(ss, dev) {
+  const sh = ss.getSheetByName(TAB_INPUT), n = sh.getLastRow();
+  if (n < 2) return [];
+  const v = sh.getRange(2, 1, n - 1, HEAD_INPUT.length).getValues(), now = new Date(), out = [];
+  v.forEach((r, i) => {
+    const st = String(r[7] || ''), lama = /^⏳/.test(st) && now - new Date(st.split('|')[1] || 0) > 10 * 60 * 1000;
+    if (!String(r[1] || '').trim() || (st && !lama)) return;
+    const row = i + 2;
+    sh.getRange(row, 8).setValue('⏳ diproses ' + dev + '|' + now.toISOString());
+    const tg = r[0] ? new Date(r[0]).getTime() : null;
+    out.push({ row, tgl: tg || null, nama: String(r[1]).trim(), jenis: String(r[2] || ''), jumlah: typeof r[3] === 'number' ? r[3] : String(r[3] == null ? '' : r[3]), satuan: String(r[4] || ''), catatan: String(r[5] || ''), oleh: String(r[6] || '') });
+  });
+  return out;
+}
+function hasil(ss, rows) {
+  const sh = ss.getSheetByName(TAB_INPUT);
+  rows.forEach(r => {
+    if (!(r.row > 1)) return;
+    sh.getRange(r.row, 8).setValue(String(r.status || ''));
+    if (!sh.getRange(r.row, 1).getValue()) sh.getRange(r.row, 1).setValue(new Date());
+  });
+}
+`;
+/* ========== Google Sheets (lewat Google Apps Script) ==========
+   POS tetap sumber utama. Sheet dipakai untuk:
+   - membaca laporan: tab Stok Bahan, Laporan Harian, Mutasi Stok (ditulis ulang oleh POS),
+   - input dari luar: tab Input Inventory (Opname / Restock / Rusak / Bahan baru) yang diproses POS,
+     lalu kolom Status diisi ✓ / ✗.
+   Pengaturan (URL & kode) ada di db.settings.gsheet (ikut sinkron); hanya perangkat yang dicentang
+   "perangkat ini mengirim & memproses" yang bekerja (soankofe.pos.gsdev), supaya tidak dobel. */
+const GS_DEV_KEY='soankofe.pos.gsdev',GS_ST_KEY='soankofe.pos.gsst';
+const gsCfg=()=>db.settings.gsheet&&typeof db.settings.gsheet==='object'?db.settings.gsheet:{};
+const gsUrlOk=u=>/^https:\/\/script\.google(usercontent)?\.com\/macros\/s\/[\w-]+\/exec$/.test(String(u||'').trim());
+const gsReady=()=>{const c=gsCfg();return !!(c.on&&gsUrlOk(c.url)&&c.kode)};
+const gsMine=()=>lsGet(GS_DEV_KEY)==='1';
+const gsSt=()=>{try{return JSON.parse(lsGet(GS_ST_KEY)||'{}')||{}}catch(e){return {}}};
+const gsStSet=o=>lsSet(GS_ST_KEY,JSON.stringify(Object.assign(gsSt(),o)));
+var GSD=1,GSB=false;
+async function gsCall(a,o,cfg){
+  const c=cfg||gsCfg();
+  const r=await fetch(String(c.url).trim(),{method:'POST',headers:{'Content-Type':'text/plain;charset=utf-8'},body:JSON.stringify(Object.assign({a,kode:c.kode},o||{})),redirect:'follow'});
+  let j;try{j=await r.json()}catch(e){throw new Error('Jawaban Google tidak terbaca. Pastikan aplikasi web diterapkan untuk "Siapa saja"')}
+  if(!j||!j.ok)throw new Error((j&&j.err)||'Gagal');return j;
+}
+const gsKodeBaru=()=>'sk-'+Array.from(crypto.getRandomValues(new Uint8Array(9)),b=>'abcdefghjkmnpqrstuvwxyz23456789'[b%31]).join('');
+const p2s=n=>String(n).padStart(2,'0'),gsDT=ts=>{const d=new Date(ts);return d.getFullYear()+'-'+p2s(d.getMonth()+1)+'-'+p2s(d.getDate())+' '+p2s(d.getHours())+':'+p2s(d.getMinutes())},gsD=ts=>gsDT(ts).slice(0,10);
+/* ---- POS → Sheet ---- */
+function gsTabs(){
+  const now=Date.now(),cat=id=>(ingCats().find(c=>c.id===id)||{}).name||'Tanpa kategori',stL={ok:'Aman',warn:'Hampir habis',bad:'Habis'};
+  const ing=db.ingredients.filter(g=>g.active!==false).slice().sort((a,b)=>cat(ingCat(a)).localeCompare(cat(ingCat(b)))||a.name.localeCompare(b.name));
+  const H=['Kategori','Bahan','Stok','Satuan','Minimum','Sisa cup','Status'].concat(hppOn()?['HPP / satuan']:[]);
+  const stok={head:H,catatan:'Diperbarui dari POS '+gsDT(now),rows:ing.map(g=>[cat(ingCat(g)),g.name,r3(g.stock),g.unit,+g.min||0,sisaCup(g)==null?'':sisaCup(g),stL[ingState(g)]].concat(hppOn()?[Math.round((+g.cost||0)*100)/100]:[]))};
+  const days=[],t0=sod(now);
+  for(let i=0;i<60;i++){const a=addDays(t0,-i),b=addDays(a,1),ss=db.sales.filter(s=>s.status==='paid'&&s.ts>=a&&s.ts<b);
+    const ex=(db.cashLog||[]).filter(e=>e.jenis==='kredit'&&e.kat&&e.ts>=a&&e.ts<b).reduce((t,e)=>t+e.jumlah,0);
+    if(!ss.length&&!ex&&i>6)continue;
+    const tun=ss.filter(s=>s.method==='cash').reduce((t,s)=>t+s.total,0),tot=ss.reduce((t,s)=>t+s.total,0),kb=cashOn()&&(db.cashLog||[]).length?cashBal(Math.min(b,now)-1):null;
+    days.push([gsD(a),ss.length,ss.reduce((t,s)=>t+s.items.reduce((x,i)=>x+i.qty,0),0),tot,tun,tot-tun,ex,kb?kb.drawer:'',kb?kb.dompet:''])}
+  const lap={head:['Tanggal','Transaksi','Item terjual','Penjualan','Tunai','Non tunai','Pengeluaran','Uang Drawer','Uang Dompet'],catatan:'Diperbarui dari POS '+gsDT(now),rows:days};
+  const mut={head:['Waktu','Bahan','Jenis','Jumlah','Satuan','Catatan','Oleh'],catatan:'300 mutasi terakhir · '+gsDT(now),rows:db.ingLog.slice(-300).reverse().map(l=>{const g=ingById(l.iid),u=userById(l.userId);return [gsDT(l.ts),g?g.name:'(dihapus)',ING_T[l.type]||l.type,r3(l.qty),g?g.unit:'',l.note||'',u?u.name:'']})};
+  return {'Stok Bahan':stok,'Laporan Harian':lap,'Mutasi Stok':mut};
+}
+/* ---- Sheet → POS: satu baris Input Inventory ---- */
+function gsUnit(g,q,u){
+  u=String(u||'').trim();const lo=s=>String(s||'').toLowerCase(),gram=/^(g|gr|gram)$/i;
+  if(!u||lo(u)===lo(g.unit)||(gram.test(u)&&gram.test(g.unit)))return q;
+  if(kmOk(g)&&lo(u)===lo(g.kemasan.unit))return q*g.kemasan.isi;
+  const k=Object.keys(UCONV).find(x=>lo(x)===lo(u)),c=k&&UCONV[k];
+  if(c&&(lo(c[0])===lo(g.unit)||(gram.test(c[0])&&gram.test(g.unit))))return q*c[1];
+  return null;
+}
+function gsApply(r){
+  const jenis=normName(r.jenis),js=String(r.jumlah==null?'':r.jumlah).trim(),q=typeof r.jumlah==='number'?r.jumlah:dec(js),note='Google Sheet'+(r.oleh?' · '+r.oleh:'')+(r.catatan?': '+r.catatan:'');
+  if(!js||!isFinite(q)||q<0)return '✗ Jumlah kosong / tidak valid';
+  if(jenis==='bahanbaru'){
+    if(db.ingredients.some(g=>normName(g.name)===normName(r.nama)))return '✗ Bahan sudah ada';
+    const unit=String(r.satuan||'').trim()||'pcs',kat=guessCat(r.nama,ingCats());
+    const g={id:'i-'+uid(),name:String(r.nama).trim().slice(0,60),kat,jenis:/k-(bersih|ops|bawa)/.test(kat)?'lain':'produk',unit,supplier:'',cost:0,min:0,stock:0,active:true};
+    db.ingredients.push(g);if(q>0){stkAdd(g,q);logIng(g.id,'restock',q,'Stok awal · '+note,0)}
+    return '✓ Bahan baru · stok '+fq(q)+' '+unit;
+  }
+  const g=opMatch(r.nama);if(!g)return '✗ Bahan tidak ditemukan';
+  const b=gsUnit(g,q,r.satuan);if(b==null)return '✗ Satuan "'+r.satuan+'" tidak cocok (pakai '+g.unit+(kmOk(g)?' / '+g.kemasan.unit:'')+')';
+  const base=r3(b),old=g.stock;
+  if(jenis==='opname'||jenis==='cekstok'){const d=r3(base-old);stkSet(g,base);logIng(g.id,'opname',d,'Cek stok · '+note);return '✓ '+g.name+' '+fq(old)+' → '+fq(base)+' '+g.unit}
+  if(jenis==='restock'||jenis==='tambah'){stkAdd(g,base);logIng(g.id,'restock',base,note);return '✓ '+g.name+' +'+fq(base)+' '+g.unit+' (stok '+fq(g.stock)+')'}
+  if(jenis==='rusak'||jenis==='waste'){stkAdd(g,-base);logIng(g.id,'waste',-base,note);return '✓ '+g.name+' −'+fq(base)+' '+g.unit+' (stok '+fq(g.stock)+')'}
+  return '✗ Jenis tidak dikenal (Opname / Restock / Rusak / Bahan baru)';
+}
+async function gsSync(force){
+  if(GSB||!gsReady()||!gsMine()||PREVIEW)return null;
+  if(!navigator.onLine){if(force)toast('Tidak ada internet');return null}
+  GSB=true;const st=gsSt(),now=Date.now();let n=0;
+  try{
+    if(force||!st.pull||now-st.pull>110e3){
+      const j=await gsCall('ambil',{dev:(S.user?S.user.name:'POS')+' · '+myDev().slice(0,4)});
+      if(j.rows&&j.rows.length){const res=j.rows.map(r=>{let s;try{s=gsApply(r)}catch(e){s='✗ '+e.message}if(/^✓/.test(s))n++;return {row:r.row,status:s+' · '+gsDT(Date.now())}});
+        if(n){save();render()}await gsCall('hasil',{rows:res});if(n)toast(n+' input dari Google Sheet diproses');else toast('Ada input Google Sheet yang gagal, cek kolom Status')}
+      gsStSet({pull:Date.now(),err:''});
+    }
+    if(force||GSD>1||(GSD&&(!st.push||now-st.push>10*60e3))){await gsCall('tulis',{tab:gsTabs()});GSD=0;gsStSet({push:Date.now(),err:''})}
+  }catch(e){gsStSet({err:e.message||'Gagal',errTs:Date.now()});if(force)toast('Google Sheet: '+(e.message||'gagal'))}
+  finally{GSB=false;const c=$('#gs-status');if(c)c.innerHTML=gsStatusHTML()}
+  return n;
+}
+if(!PREVIEW){setInterval(()=>{if(S.user)gsSync(false)},60e3);addEventListener('online',()=>setTimeout(()=>gsSync(false),3000))}
+/* ---- Pengaturan ---- */
+function gsStatusHTML(){
+  const st=gsSt(),c=gsCfg();if(!gsReady())return '';
+  if(!gsMine())return '<span class="pill">Perangkat ini tidak memproses</span> Perangkat lain yang mengirim laporan dan memproses input.';
+  return (st.err?'<span class="pill bad">Gagal</span> '+esc(st.err):'<span class="pill ok">Terhubung</span>'+(c.nama?' '+esc(c.nama):''))
+    +(st.push?' · laporan terkirim '+fmtDT(st.push):'')+(st.pull?' · input dicek '+fmtTime(st.pull):'');
+}
+function gsCardHTML(){
+  const c=gsCfg(),on=gsReady();
+  if(!on)return '<div class="card"><div class="card-h"><h3>Google Sheets</h3><span class="pill">Belum terhubung</span></div><div class="form">'
+    +'<p class="muted" style="margin:0">Input inventory dari Google Sheet dan laporan otomatis ke Sheet.</p>'
+    +'<ol class="gs-steps"><li>Buat Google Sheet baru di Google Drive.</li><li>Buka <b>Ekstensi → Apps Script</b>, hapus isinya, lalu tempel kode dari tombol <b>Salin kode Apps Script</b>.</li><li><b>Terapkan → Deployment baru → Aplikasi web</b>. Jalankan sebagai: <b>Saya</b>, akses: <b>Siapa saja</b>. Izinkan akses.</li><li>Salin <b>URL aplikasi web</b> ke kolom di bawah, lalu ketuk <b>Tes & hubungkan</b>.</li></ol>'
+    +'<div class="fld"><label class="lbl" for="gs-kode">Kode rahasia</label><input class="in" id="gs-kode" value="'+esc(c.kode||S.gsKode||(S.gsKode=gsKodeBaru()))+'" maxlength="40" autocomplete="off"></div>'
+    +'<button class="btn ghost" data-act="gs-copy">'+ico('copy')+'Salin kode Apps Script</button>'
+    +'<div class="fld"><label class="lbl" for="gs-url">URL aplikasi web</label><input class="in" id="gs-url" value="'+esc(c.url||'')+'" placeholder="https://script.google.com/macros/s/…/exec" inputmode="url" autocomplete="off"></div>'
+    +'<button class="btn primary" data-act="gs-connect">Tes & hubungkan</button></div></div>';
+  return '<div class="card"><div class="card-h"><h3>Google Sheets</h3><span class="pill ok">Aktif</span></div><div class="form">'
+    +'<p class="muted" id="gs-status" style="margin:0">'+gsStatusHTML()+'</p>'
+    +'<label class="chk"><input type="checkbox" data-act="gs-mine"'+(gsMine()?' checked':'')+'>Perangkat ini mengirim laporan & memproses input</label>'
+    +'<p class="muted help" style="margin:0">Centang di <b>satu</b> perangkat saja, misalnya tablet kasir. Input di tab <b>Input Inventory</b> diproses setiap ±2 menit, laporan dikirim setiap ±10 menit.</p>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap"><button class="btn ghost" data-act="gs-now">Sinkron sekarang</button><button class="btn ghost" data-act="gs-copy">'+ico('copy')+'Salin kode Apps Script</button><button class="btn danger" data-act="gs-off">Putuskan</button></div></div></div>';
+}
+ACT['gs-copy']=()=>{const k=(($('#gs-kode')||{}).value||gsCfg().kode||'').trim();if(k.length<8){toast('Kode rahasia minimal 8 karakter');return}copyText(GS_CODE.replace('__KODE__',k));toast('Kode Apps Script disalin. Tempel di Apps Script');};
+ACT['gs-connect']=async el=>{
+  const url=$('#gs-url').value.trim(),kode=$('#gs-kode').value.trim();
+  if(kode.length<8||!/^[\w-]+$/.test(kode)){toast('Kode rahasia minimal 8 karakter (huruf, angka, -)');return}
+  if(!gsUrlOk(url)){toast('URL harus seperti https://script.google.com/macros/s/…/exec');$('#gs-url').focus();return}
+  el.disabled=true;el.textContent='Menghubungkan…';
+  try{const j=await gsCall('ping',{},{url,kode});db.settings.gsheet={on:true,url,kode,nama:j.nama||''};lsSet(GS_DEV_KEY,'1');save();GSD=2;render();toast('Terhubung ke '+(j.nama||'Google Sheet'));setTimeout(()=>gsSync(true),300)}
+  catch(e){toast('Gagal: '+(e.message||'tidak bisa dihubungi'));el.disabled=false;el.textContent='Tes & hubungkan'}
+};
+ACT['gs-mine']=el=>{lsSet(GS_DEV_KEY,el.checked?'1':'0');if(el.checked){GSD=2;gsSync(true)}const s=$('#gs-status');if(s)s.innerHTML=gsStatusHTML()};
+ACT['gs-now']=async el=>{el.disabled=true;const n=await gsSync(true);el.disabled=false;if(n===0&&!gsSt().err)toast('Laporan terkirim. Tidak ada input baru')};
+ACT['gs-off']=()=>confirmBox('Putuskan Google Sheets','POS berhenti mengirim laporan dan membaca input. Isi Google Sheet tidak dihapus.','Putuskan',()=>{db.settings.gsheet={on:false,kode:gsCfg().kode||''};save();render();toast('Google Sheets diputuskan')},true);
 /* ---- tampilan di Pengaturan ---- */
 function syncCardHTML(){
   const on=syncOn(),local=SG.mode==='local';
