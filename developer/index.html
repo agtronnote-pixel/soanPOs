@@ -427,7 +427,7 @@ function itemHTML(group,x,i,on){
   }
   if(group==='menu'&&on)extra='<label class="tg" title="Terlihat oleh kasir"><input type="checkbox" data-kasir="'+x.id+'"'+(x.kasir?' checked':'')+(locked?' disabled':'')+'>Kasir</label>';
   const acts=locked?'<span class="lock">🔒 wajib</span>':'<button class="btn icon sm" data-act="'+(on?'hide':'show')+'" data-g="'+group+'" data-id="'+x.id+'" title="'+(on?'Sembunyikan (kurangi)':'Tampilkan (tambah)')+'">'+(on?'−':'+')+'</button>';
-  const mv=on?'<button class="btn icon sm" data-act="up" data-g="'+group+'" data-id="'+x.id+'" title="Naik" aria-label="Naik">↑</button><button class="btn icon sm" data-act="down" data-g="'+group+'" data-id="'+x.id+'" title="Turun" aria-label="Turun">↓</button>':'';
+  const mv='';/* urutan diatur dengan seret ⠿ */
   return '<div class="it" data-g="'+group+'" data-id="'+x.id+'" data-locked="'+(locked?1:0)+'"><button class="handle" aria-label="Seret untuk memindah" title="Seret">⠿</button>'+name+extra+'<div class="acts">'+mv+acts+'</div></div>';
 }
 function zonesHTML(group,list,titleOn,titleOff){
@@ -495,6 +495,13 @@ function endDrag(e){
   changed();
 }
 document.addEventListener('pointerup',endDrag);document.addEventListener('pointercancel',endDrag);
+/* keyboard: fokus pegangan ⠿ lalu tekan ↑ / ↓ */
+document.addEventListener('keydown',e=>{
+  const h=e.target.closest&&e.target.closest('.handle');if(!h||(e.key!=='ArrowUp'&&e.key!=='ArrowDown'))return;
+  const it=h.closest('.it');if(!it)return;e.preventDefault();const g=it.dataset.g,id=it.dataset.id,up=e.key==='ArrowUp';
+  if(g==='menu')(up?ACT.mup:ACT.mdown)({dataset:{id}});else if(ACT.up&&!g.startsWith('blk:'))(up?ACT.up:ACT.down)({dataset:{g,id}});else return;
+  setTimeout(()=>{const n=document.querySelector('.it[data-g="'+g+'"][data-id="'+id+'"] .handle');if(n)n.focus()},40);
+});
 
 /* ---------- tampilan editor ---------- */
 const SEC_HTML={};
@@ -520,7 +527,7 @@ function nodeHTML(x,depth,on,prev){
   const ico={view:'▣',grup:'▤',halaman:'▧',tautan:'↗'}[kind];
   const orig=MENU[x.id];
   const canIn=on&&prev&&prev.jenis==='grup'&&fitsAt(x,depth+1);
-  const acts=on?'<button class="btn icon sm" data-act="mup" data-id="'+x.id+'" title="Naik" aria-label="Naik">↑</button><button class="btn icon sm" data-act="mdown" data-id="'+x.id+'" title="Turun" aria-label="Turun">↓</button>'
+  const acts=on?''
       +(depth>1?'<button class="btn icon sm" data-act="mout" data-id="'+x.id+'" title="Keluarkan dari grup" aria-label="Keluarkan dari grup">⇤</button>':'')
       +(canIn?'<button class="btn icon sm" data-act="min" data-id="'+x.id+'" title="Masukkan ke grup di atasnya" aria-label="Masukkan ke grup di atasnya">⇥</button>':'')
       +(kind==='halaman'?'<button class="btn sm'+(S.editPage===x.id?' dark':'')+'" data-act="pg-edit" data-id="'+x.id+'">Isi</button>':'')
