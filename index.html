@@ -352,6 +352,10 @@ textarea.code{font:11.5px/1.5 ui-monospace,Menlo,Consolas,monospace;min-height:2
 .pbar i.warn{background:var(--warn)}.pbar i.bad{background:var(--bad)}
 .set-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(320px,100%),1fr));gap:14px;align-items:start}
 .sus-bar{margin-bottom:12px;justify-content:space-between}.rk-list{max-height:34vh;overflow:auto;border-top:1px solid var(--line)}
+@media (max-width:999px){body.ds-on #devbar{height:auto;max-height:none}body.ds-on #devbar .dv-body,body.ds-on #devbar .dv-foot{display:none}body.ds-on .content{padding-bottom:160px}}
+body.ds-on #devbar .dv-head{gap:8px}
+body.ds-on #app [data-dsk]{outline:1.5px dashed var(--amber);outline-offset:2px;cursor:pointer}body.ds-on #app [data-dsk]:hover{outline-style:solid}.ds-hid{opacity:.35}
+#ds-pop{position:fixed;z-index:120;background:var(--surface);color:var(--ink);border:1px solid var(--line);border-radius:14px;box-shadow:0 14px 40px rgba(0,0,0,.25);padding:12px;display:flex;flex-direction:column;gap:8px}#ds-pop .ds-h{display:flex;justify-content:space-between;align-items:center}#ds-pop .ds-roles{display:grid;grid-template-columns:1fr 1fr;gap:4px 10px}#ds-pop .ds-f{display:flex;justify-content:space-between;gap:8px;margin-top:4px}
 .receipt.rcl{font:12.5px/1.5 ui-monospace,Menlo,Consolas,monospace;white-space:pre;overflow-x:auto}.receipt.rcl .c{text-align:center}.receipt.rcl .b{font-weight:700}.receipt.rcl .big{font-size:20px;line-height:1.3;margin:2px 0 4px;letter-spacing:1px}.receipt.rcl hr{border:0;border-top:1px dashed var(--line-2);margin:6px 0}
 .ck-docs{flex-wrap:wrap}.ck-lbls{display:flex;flex-direction:column;gap:6px}.ck-l{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.1fr);gap:8px;align-items:center;font-size:12.5px}.ck-l span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted)}.ck-l .in{min-height:34px;padding:5px 8px}.ck-pv{font:11px/1.45 ui-monospace,Menlo,Consolas,monospace;background:var(--paper);color:var(--paper-ink);border:1px solid var(--line);border-radius:10px;padding:10px;white-space:pre;overflow:auto;max-height:50vh;margin:4px 0 8px}
 .rc-beda{display:flex;flex-direction:column;gap:8px}.rc-beda:empty{display:none}.rc-tabs{display:flex;gap:8px;flex-wrap:wrap;align-items:center}.rc-tabs .seg{flex:1;min-width:200px}
@@ -1043,7 +1047,7 @@ ACT['tb-none']=()=>{S.pos.tambah={};S.pos.tbDone=true;openPay()};
 ACT['tb-go']=()=>{S.pos.tbDone=true;openPay()};
 function openPay(){
   if(!S.pos.cart.length)return;
-  if((S.pos.type==='take'||S.pos.type==='delivery')&&!S.pos.tbDone&&tawarList().length){tambahOpen();return}
+  if(alur('tanyaPlastik')&&(S.pos.type==='take'||S.pos.type==='delivery')&&!S.pos.tbDone&&tawarList().length){tambahOpen();return}
   const T=totals();S.pay={method:UI.methods[0]||'cash',received:'',ref:''};
   modal({title:'Pembayaran',body:payBody(T),foot:payFoot(T)});
 }
@@ -1065,17 +1069,19 @@ function completeSale(){
   const sus=S.sus&&db.shifts.find(x=>x.id===S.sus.shiftId),ts=sus?S.sus.ts:Date.now(),no=nextNo(ts);
   const sale=Object.assign({id:uid(),no,ts,userId:S.user.id,customerId:S.pos.customerId,type:S.pos.type,table:S.pos.type==='dine'?S.pos.table:'',items:cart.map(i=>{const pr=prodById(i.pid),rc=lineRec(i,S.pos.type),rcost=rc.reduce((a,r)=>{const g=ingById(r.iid);return a+(g?(+g.cost||0)*r.qty:0)},0);const cost=pr&&modeOf(pr)==='recipe'?Math.round(rcost):Math.round((pr?unitCost(pr):i.cost)*(1)+rcost);const o={pid:i.pid,name:i.name,price:i.price,cost,qty:i.qty,note:i.note,rec:rc};if(i.saji)o.saji=i.saji;if(i.uk){o.uk=i.uk;o.ukl=i.ukl}if(i.ad&&i.ad.length)o.ad=i.ad.slice();if(i.saji||i.uk||(i.ad&&i.ad.length))o.base=i.base||i.name;return o}),discType:S.pos.disc.type,discValue:S.pos.disc.value,taxRate:st.taxEnabled?st.taxRate:0,serviceRate:st.serviceEnabled?st.serviceRate:0,method:p.method,ref:p.ref||'',paid,change,status:'paid',shiftId:sus?sus.id:curShift().id,points:0},T);
   if(sus)sale.susulan={by:S.user.id,at:Date.now()};
-  cart.forEach(i=>{const pr=prodById(i.pid);if(pr&&modeOf(pr)==='stock'){stkAdd(pr,-i.qty);logStock(pr.id,'sale',-i.qty,no)}});
-  {const pt=(db.settings.perTrx||[]).filter(r=>r.iid&&ingById(r.iid)&&+r.qty>0).map(r=>({iid:r.iid,qty:+r.qty}));if(pt.length)sale.trx=pt}
+  const potong=alur('stokJual');if(!potong)sale.noStock=1;
+  if(potong)cart.forEach(i=>{const pr=prodById(i.pid);if(pr&&modeOf(pr)==='stock'){stkAdd(pr,-i.qty);logStock(pr.id,'sale',-i.qty,no)}});
+  if(alur('perTrx')){const pt=(db.settings.perTrx||[]).filter(r=>r.iid&&ingById(r.iid)&&+r.qty>0).map(r=>({iid:r.iid,qty:+r.qty}));if(pt.length)sale.trx=pt}
   if(sale.type==='take'||sale.type==='delivery'){const T=S.pos.tambah||{},tb=Object.keys(T).filter(id=>T[id]>0&&ingById(id)).map(id=>({iid:id,qty:T[id]}));if(tb.length)sale.tambah=tb}
   const use={};sale.items.forEach(i=>i.rec.forEach(r=>{use[r.iid]=(use[r.iid]||0)+r.qty*i.qty}));(sale.tambah||[]).concat(sale.trx||[]).forEach(r=>{use[r.iid]=(use[r.iid]||0)+r.qty});
-  Object.keys(use).forEach(id=>{const g=ingById(id);if(g){stkAdd(g,-use[id]);logIng(id,'sale',-use[id],no)}});
+  if(potong)Object.keys(use).forEach(id=>{const g=ingById(id);if(g){stkAdd(g,-use[id]);logIng(id,'sale',-use[id],no)}});
   const cu=sale.customerId?custById(sale.customerId):null;
   if(cu){sale.points=Math.floor(T.total/st.pointsPer);cu.points+=sale.points}
   db.sales.push(sale);
   if(sus&&sale.method==='cash'&&S.sus.kasSudah)sale.kasSudah=1;
   if(sus){shiftEditLog(sus,'Transaksi susulan '+sale.no+' · '+rp(sale.total));S.sus=null}
-  if(sale.method==='cash'&&cashOn()&&!sale.kasSudah){const mv=cashIn(sale.total,'Penjualan '+sale.no+(sus?' (susulan)':''),{ref:sale.id});if(mv)setTimeout(()=>toast('Drawer lebih dari '+rp(drawerLimit())+': '+rp(mv)+' dipindah ke Dompet'),2600)}
+  if(sale.method==='cash'&&cashOn()&&!sale.kasSudah&&!alur('kasJual'))sale.noKas=1;
+  if(sale.method==='cash'&&cashOn()&&!sale.kasSudah&&!sale.noKas){const mv=cashIn(sale.total,'Penjualan '+sale.no+(sus?' (susulan)':''),{ref:sale.id});if(mv)setTimeout(()=>toast('Drawer lebih dari '+rp(drawerLimit())+': '+rp(mv)+' dipindah ke Dompet'),2600)}
   if(sus)shiftRecalc(sus);
   save();
   S.pos=Object.assign(freshPos(),{cat:S.pos.cat,q:S.pos.q});S.pay=null;
@@ -1198,11 +1204,11 @@ function voidGo(id){
   if(!canDo('void')){toast('Tidak punya akses membatalkan transaksi');return}
   const s=db.sales.find(x=>x.id===id);if(!s||s.status==='void')return;
   s.status='void';s.voidReason=$('#vr').value;s.voidTs=Date.now();s.voidBy=S.user.id;
-  s.items.forEach(i=>{const p=prodById(i.pid);if(p&&modeOf(p)==='stock'){stkAdd(p,i.qty);logStock(p.id,'void',i.qty,s.no)}});
+  if(!s.noStock)s.items.forEach(i=>{const p=prodById(i.pid);if(p&&modeOf(p)==='stock'){stkAdd(p,i.qty);logStock(p.id,'void',i.qty,s.no)}});
   const back={};s.items.forEach(i=>(i.rec||[]).forEach(r=>{back[r.iid]=(back[r.iid]||0)+r.qty*i.qty}));(s.tambah||[]).concat(s.trx||[]).forEach(r=>{back[r.iid]=(back[r.iid]||0)+r.qty});
-  Object.keys(back).forEach(id=>{const g=ingById(id);if(g){stkAdd(g,back[id]);logIng(id,'void',back[id],s.no)}});
+  if(!s.noStock)Object.keys(back).forEach(id=>{const g=ingById(id);if(g){stkAdd(g,back[id]);logIng(id,'void',back[id],s.no)}});
   const cu=s.customerId?custById(s.customerId):null;if(cu)cu.points=Math.max(0,cu.points-(s.points||0));
-  if(s.method==='cash'&&cashOn())cashOut(s.total,'Pembatalan '+s.no,{ref:s.id});
+  if(s.method==='cash'&&cashOn()&&!s.noKas)cashOut(s.total,'Pembatalan '+s.no,{ref:s.id});
   {const sh=db.shifts.find(x=>x.id===s.shiftId);if(sh&&sh.closeTs&&!sh.manual){shiftEditLog(sh,'Pembatalan '+s.no+' · '+rp(s.total));shiftRecalc(sh)}}
   save();closeModal();render();toast('Transaksi dibatalkan');
 }
@@ -1368,7 +1374,7 @@ function cashOverflow(){
   cashEntry('dompet','debit',lebih,'Pindahan otomatis dari Drawer',{auto:1,grp:g});
   return lebih;
 }
-function cashIn(jumlah,ket,o){cashEntry('drawer','debit',jumlah,ket,o);return cashOverflow()}
+function cashIn(jumlah,ket,o){cashEntry('drawer','debit',jumlah,ket,o);return alur('pindahDompet')?cashOverflow():0}
 function cashOut(jumlah,ket,o){
   jumlah=Math.round(+jumlah||0);const b=cashBal(),dari=Math.min(Math.max(0,b.dompet),jumlah),sisa=jumlah-dari,g=uid();
   if(dari>0)cashEntry('dompet','kredit',dari,ket,Object.assign({grp:g},o||{}));
@@ -2208,7 +2214,7 @@ function lineRec(i,type){
   if(i.saji)sajiRec(i.saji,type).forEach(r=>pack.push(r));
   pack.forEach(r=>add(r.iid,r.qty));
   (i.ad||[]).forEach(id=>{const a=addonById(id);if(a)(a.rec||[]).forEach(r=>add(r.iid,+r.qty))});
-  const st=stikerIid();if(st&&p&&p.sticker!==false){const n=pack.reduce((t,r)=>{const g=ingById(r.iid);return t+(g&&g.stiker?r.qty:0)},0);if(n>0)add(st,n)}
+  const st=alur('stiker')&&stikerIid();if(st&&p&&p.sticker!==false){const n=pack.reduce((t,r)=>{const g=ingById(r.iid);return t+(g&&g.stiker?r.qty:0)},0);if(n>0)add(st,n)}
   return Object.keys(m).filter(iid=>m[iid]>0).map(iid=>({iid,qty:m[iid]}));
 }
 function linePrice(p,ukId,ad){const uk=prodUk(p).find(u=>u.id===ukId);return (uk&&+uk.price>0?+uk.price:p.price)+(ad||[]).reduce((t,id)=>{const a=addonById(id);return t+(a?+a.price||0:0)},0)}
@@ -3233,7 +3239,7 @@ ACT['cash-save']=el=>{
   if(cashOn()){if(mv.type==='in'){const o=cashIn(a,'Kas masuk'+(note?': '+note:''),{ref:mv.id,foto});if(o)msg='Tersimpan. '+rp(o)+' dipindah otomatis ke Dompet'}else{const r=cashOut(a,note||'Kas keluar',{ref:mv.id,foto});msg='Tersimpan. Diambil dari '+(r.dompet&&r.drawer?'Dompet '+rp(r.dompet)+' + Drawer '+rp(r.drawer):r.dompet?'Dompet':'Drawer')}}
   save();closeModal();render();toast(msg);
 };
-ACT['shift-close']=()=>{if(db.held.length){toast('Masih ada '+db.held.length+' pesanan tersimpan. Selesaikan atau hapus dulu.');return}shiftCloseModal()};
+ACT['shift-close']=()=>{if(db.held.length&&alur('tutupHeld')){toast('Masih ada '+db.held.length+' pesanan tersimpan. Selesaikan atau hapus dulu.');return}shiftCloseModal()};
 INP['sc-cash']=el=>{
   const sh=curShift(),d=num(el.value)-shiftExpected(sh,shiftStats(sh)),o=$('#sc-diff');
   o.textContent=el.value.trim()===''?'—':(d===0?'Cocok':(d>0?'Lebih ':'Kurang ')+rp(Math.abs(d)));
@@ -4051,11 +4057,13 @@ function devStart(){
     const ordIds=(P.o||[]).map(x=>x[0]),seen=cur.map(x=>x&&x.id).filter(id=>ordIds.includes(id));const order=seen.concat(ordIds.filter(id=>!seen.includes(id))).concat((P.f||[]).map(x=>x[0]));
     d.bagian[pg]=order.map(id=>{const x=cur.find(y=>y&&y.id===id)||{};const o={id,tampil:x.tampil!==false};if(x.label)o.label=x.label;return o})});
   d.cetak=dvClone((db.settings.ui&&db.settings.ui.cetak)||{});
+  d.desain=dvClone((db.settings.ui&&db.settings.ui.desain)||{t:{},h:{},r:{}});
+  d.alur=dvClone((db.settings.ui&&db.settings.ui.alur)||{});
   d.transaksi={filterAwal:(eff.transaksi&&eff.transaksi.filterAwal)||UI0.salesRange};d.laporanRentang=eff.laporanRentang||UI0.reportRange;
   S.dev={draft:d,saved:JSON.stringify(d),open:{nav:true},sel:null};
   document.body.classList.add('dev-on');cfgApply();render();devRender();
 }
-function devStop(){S.dev=null;document.body.classList.remove('dev-on');const b=$('#devbar');if(b)b.remove();cfgApply();render()}
+function devStop(){dsClose();document.body.classList.remove('ds-on');S.dev=null;document.body.classList.remove('dev-on');const b=$('#devbar');if(b)b.remove();cfgApply();render()}
 const devDirty=()=>S.dev&&JSON.stringify(S.dev.draft)!==S.dev.saved;
 function devFind(id,arr,depth,parent){arr=arr||S.dev.draft.menu;depth=depth||1;for(let i=0;i<arr.length;i++){const x=arr[i];if(x.id===id)return {arr,i,x,depth,parent:parent||null};if(Array.isArray(x.anak)){const r=devFind(id,x.anak,depth+1,x);if(r)return r}}return null}
 const devIsGroup=x=>x&&x.jenis==='grup';
@@ -4100,10 +4108,88 @@ function devRender(){
   const tam='<div class="fld"><label class="lbl" for="dv-aksen">Warna aksen</label><div style="display:flex;gap:8px;align-items:center"><input type="color" id="dv-aksen" data-dvc="aksen" value="'+(hexOk(d.tema.aksen)?d.tema.aksen:'#F2A31B')+'"><button class="btn sm ghost" data-dv="aksen-reset">Bawaan</button></div></div>'
     +'<div class="fld"><label class="lbl" for="dv-judul">Judul halaman login</label><input class="in" id="dv-judul" data-dvc="judul" value="'+esc(d.teks.judulLogin||'')+'" maxlength="40"></div><div class="fld"><label class="lbl" for="dv-tag">Hashtag login</label><input class="in" id="dv-tag" data-dvc="tag" value="'+esc(d.teks.hashtag||'')+'" maxlength="40"></div>'
     +'<div class="lbl">Kartu di halaman Laporan</div>'+d.laporan.map(x=>sw('lap',x.id,x.tampil!==false,RLBL[x.id]||x.id)).join('');
-  el.innerHTML='<div class="dv-head"><div><b>Bilah Developer</b><span>'+(dirty?'Ada perubahan belum disimpan':'Tersimpan · berlaku di semua perangkat')+'</span></div><button class="icon-btn" data-dv="close" aria-label="Tutup bilah">✕</button></div>'
-    +'<div class="dv-body">'+devSec('nav','Navigasi & sub menu',nav)+devSec('fit','Fitur',fit)+devSec('sub','Sub menu halaman',sub+'<p class="dv-help" style="margin-top:12px">Bagian setiap halaman yang aktif: seret ⠿ untuk urutan, centang untuk menampilkan.</p>'+sub2)+devSec('kas','Halaman Kasir',kas)+devSec('cetak','Format cetak (struk & laporan)',S.dev.open.cetak?ckHTML():'')+devSec('tam','Tampilan & laporan',tam)
+  el.innerHTML='<div class="dv-head"><div><b>Bilah Developer</b><span>'+(S.dev.ds?'Mode desain · ketuk elemen di layar':dirty?'Ada perubahan belum disimpan':'Tersimpan · berlaku di semua perangkat')+'</span></div>'+(S.dev.ds?'<button class="btn sm primary" data-dv="ds-off">Selesai desain</button>':'')+'<button class="icon-btn" data-dv="close" aria-label="Tutup bilah">✕</button></div>'
+    +'<div class="dv-body">'+devSec('nav','Navigasi & sub menu',nav)+devSec('fit','Fitur',fit)+devSec('sub','Sub menu halaman',sub+'<p class="dv-help" style="margin-top:12px">Bagian setiap halaman yang aktif: seret ⠿ untuk urutan, centang untuk menampilkan.</p>'+sub2)+devSec('kas','Halaman Kasir',kas)+devSec('ds','Desain di layar (teks, tombol, peran)',S.dev.open.ds?dsBarHTML():'')+devSec('alur','Alur data (masuk & keluar)',S.dev.open.alur?alurHTML():'')+devSec('cetak','Format cetak (struk & laporan)',S.dev.open.cetak?ckHTML():'')+devSec('tam','Tampilan & laporan',tam)
     +'<div class="dv-reset"><button class="btn sm ghost" data-dv="reset">Kembalikan ke pengaturan dasar</button></div></div>'
     +'<div class="dv-foot"><button class="btn ghost" data-dv="cancel"'+(dirty?'':' disabled')+'>Batalkan</button><button class="btn primary" data-dv="save"'+(dirty?'':' disabled')+'>Simpan & sebarkan</button></div>';
+}
+/* ---- alur data (on/off) — bawaan semua menyala, sama seperti sebelumnya ---- */
+const ALUR=[
+  ['stokJual','Potong stok bahan & produk saat transaksi dibayar','Mati: penjualan tidak mengurangi stok (stok hanya dari opname / restock).'],
+  ['kasJual','Penjualan tunai masuk jurnal kas Drawer','Mati: tunai dari penjualan tidak dicatat di Drawer & Dompet.'],
+  ['pindahDompet','Drawer melebihi batas otomatis pindah ke Dompet','Batas diatur di Keuangan → Batas Drawer.'],
+  ['tanyaPlastik','Tanya plastik / kantong saat Bayar (take away & delivery)',''],
+  ['perTrx','Potong bahan per transaksi (mis. kertas struk)','Daftar bahan di Menu & Bahan → Pilihan menu.'],
+  ['stiker','Sticker otomatis untuk kemasan plastik / botol',''],
+  ['tutupHeld','Tolak tutup shift bila masih ada pesanan tersimpan','']
+];
+const alur=k=>{const a=(S.dev&&S.dev.draft&&S.dev.draft.alur)||(db.settings.ui&&db.settings.ui.alur)||{};return a[k]!==false};
+/* ========== Desain antarmuka langsung di layar (khusus Owner, Bilah Developer) ==========
+   settings.ui.desain = {t:{kunci:'teks baru'}, h:{kunci:true}, r:{kunci:['kasir',...]}}
+   Kunci tombol  : 'b:'+data-act(+':'+data-v)        → ubah teks, sembunyikan, sembunyikan per peran
+   Kunci tulisan : 't:'+halaman+':'+teks asli        → judul kartu & label
+   Tombol penting (bayar, login, tutup jendela, bilah developer, dll.) sengaja tidak bisa diubah. */
+const DS_SKIP=new Set(['pay','pay-confirm','pin','pick-user','dev-open','close','bg-close','confirm-yes','confirm-no','logout','logout-go','nav','add','add-saji','ch-go','ch-sj','ch-uk','thf','thf-pick','cart-toggle','cart-close','qty','ci-saji','ci-opt','mt','held-resume','shift-close','shift-close-go','open-shift','sync-go','gs-connect','prod-save','ing-save','recv-save','ing-restock-save','exp-save','exp-ket-go','trm-go','fin-adj-go','rk-edit-go','sus-go','sus-cancel','ds-save','ds-reset','ds-close','tb-done','tb-skip']);
+const DS_ROLES=[['manager','Manager'],['kasir','Kasir'],['barista','Barista'],['inventory','Staf Inventory']];
+const dsCfg=()=>{const c=(S.dev&&S.dev.draft&&S.dev.draft.desain)||(db.settings.ui&&db.settings.ui.desain)||{};return {t:c.t||{},h:c.h||{},r:c.r||{}}};
+const dsOn=()=>!!(S.dev&&S.dev.ds);
+function dsKey(el){
+  if(el.dataset.dsk)return el.dataset.dsk;
+  const a=el.dataset.act;
+  if(a){if(!/^(BUTTON|A)$/.test(el.tagName)||DS_SKIP.has(a)||el.closest('#devbar,#ds-pop,.login,#thf-pop,#wa-ask,#upd-bar'))return '';return 'b:'+a+(el.dataset.v!=null&&el.dataset.v.length<24?':'+el.dataset.v:'')}
+  if(el.matches('.card-h h3, .card > h3, .kpi .lbl, .modal-h h3, .card-h .lbl')&&!el.closest('#devbar,#ds-pop')){const o=el.dataset.dso||(el.dataset.dso=el.textContent.trim());return o&&o.length<60?'t:'+(S.view||'')+':'+o:''}
+  return '';
+}
+function dsSetText(el,t){
+  const nodes=[...el.childNodes].filter(n=>n.nodeType===3&&n.nodeValue.trim());
+  if(el.dataset.dso==null)el.dataset.dso=nodes.map(n=>n.nodeValue).join('').trim()||el.textContent.trim();
+  if(nodes.length){nodes[nodes.length-1].nodeValue=t;nodes.slice(0,-1).forEach(n=>n.nodeValue='')}else el.appendChild(document.createTextNode(t));
+}
+function dsApply(root){
+  const C=dsCfg(),me=S.user?userStatus(S.user):'',dz=dsOn();
+  if(!Object.keys(C.t).length&&!Object.keys(C.h).length&&!Object.keys(C.r).length&&!dz)return;
+  (root||document).querySelectorAll('[data-act],.card-h h3,.card > h3,.kpi .lbl,.modal-h h3,.card-h .lbl').forEach(el=>{
+    const k=dsKey(el);if(!k)return;el.dataset.dsk=k;
+    if(C.t[k]!=null&&el.dataset.dst!==C.t[k]){dsSetText(el,C.t[k]);el.dataset.dst=C.t[k]}
+    const hid=!!C.h[k]||(me&&me!=='owner'&&(C.r[k]||[]).includes(me));
+    el.classList.toggle('ds-hid',hid&&dz);
+    if(hid&&!dz){if(!el.hasAttribute('data-dsh')){el.setAttribute('data-dsh','');el.style.setProperty('display','none','important')}}
+    else if(el.hasAttribute('data-dsh')){el.removeAttribute('data-dsh');el.style.removeProperty('display')}
+  });
+}
+let DSQ=false;
+new MutationObserver(()=>{if(DSQ)return;DSQ=true;queueMicrotask(()=>{DSQ=false;try{dsApply()}catch(e){}})}).observe(document.documentElement,{childList:true,subtree:true});
+/* mode desain: ketuk elemen → jendela kecil ubah teks / sembunyikan / per peran */
+document.addEventListener('click',e=>{
+  if(!dsOn())return;const el=e.target.closest('[data-dsk]');if(!el||el.closest('#devbar,#ds-pop'))return;
+  e.preventDefault();e.stopPropagation();dsPop(el);
+},true);
+function dsPop(el){
+  const k=el.dataset.dsk,C=S.dev.draft.desain||(S.dev.draft.desain={t:{},h:{},r:{}});['t','h','r'].forEach(x=>C[x]=C[x]||{});
+  const orig=el.dataset.dso||el.textContent.trim(),isB=k.startsWith('b:'),R=C.r[k]||[];
+  let p=$('#ds-pop');if(!p){p=document.createElement('div');p.id='ds-pop';document.body.appendChild(p)}
+  p.dataset.k=k;
+  p.innerHTML='<div class="ds-h"><b>'+(isB?'Tombol':'Tulisan')+'</b><button type="button" class="icon-btn sm" data-act="ds-close" aria-label="Tutup">'+ico('x')+'</button></div>'
+   +'<label class="lbl" for="ds-t">Teks</label><input class="in" id="ds-t" value="'+esc(C.t[k]!=null?C.t[k]:'')+'" placeholder="'+esc(orig)+'" maxlength="40">'
+   +'<label class="chk"><input type="checkbox" id="ds-h"'+(C.h[k]?' checked':'')+'>Sembunyikan untuk semua</label>'
+   +(isB?'<div class="lbl">Sembunyikan untuk peran</div><div class="ds-roles">'+DS_ROLES.map(([r,l])=>'<label class="chk"><input type="checkbox" data-dsr="'+r+'"'+(R.includes(r)?' checked':'')+'>'+l+'</label>').join('')+'</div><p class="muted" style="margin:0;font-size:12px">Owner selalu melihat semua tombol.</p>':'')
+   +'<div class="ds-f"><button type="button" class="btn sm ghost" data-act="ds-reset">Kembalikan</button><button type="button" class="btn sm primary" data-act="ds-save">Terapkan</button></div>';
+  const r=el.getBoundingClientRect(),W=Math.min(300,innerWidth-24);p.style.width=W+'px';
+  p.style.left=Math.max(12,Math.min(innerWidth-W-12,r.left))+'px';p.style.top=Math.min(innerHeight-20,r.bottom+8)+'px';p.hidden=false;
+  requestAnimationFrame(()=>{const b=p.getBoundingClientRect();if(b.bottom>innerHeight-8)p.style.top=Math.max(8,r.top-b.height-8)+'px';const i=$('#ds-t');if(i)i.focus()});
+}
+const dsClose=()=>{const p=$('#ds-pop');if(p)p.remove()};
+ACT['ds-close']=dsClose;
+ACT['ds-save']=()=>{const p=$('#ds-pop');if(!p||!S.dev)return;const k=p.dataset.k,C=S.dev.draft.desain,t=$('#ds-t').value.trim();
+  if(t)C.t[k]=t;else delete C.t[k];if($('#ds-h').checked)C.h[k]=true;else delete C.h[k];
+  const rs=$$('[data-dsr]').filter(x=>x.checked).map(x=>x.dataset.dsr);if(rs.length)C.r[k]=rs;else delete C.r[k];
+  dsClose();document.querySelectorAll('[data-dsk="'+CSS.escape(k)+'"]').forEach(el=>{delete el.dataset.dst});devLive();toast('Diterapkan. Ketuk Simpan & sebarkan untuk menyimpan')};
+ACT['ds-reset']=()=>{const p=$('#ds-pop');if(!p||!S.dev)return;const k=p.dataset.k,C=S.dev.draft.desain;delete C.t[k];delete C.h[k];delete C.r[k];dsClose();devLive();render();toast('Dikembalikan ke bawaan')};
+function dsListHTML(){
+  const C=dsCfg(),keys=[...new Set(Object.keys(C.t).concat(Object.keys(C.h),Object.keys(C.r)))];
+  if(!keys.length)return '<p class="dv-help">Belum ada perubahan.</p>';
+  const nm=k=>{const p=k.split(':');return k.startsWith('b:')?'Tombol '+p.slice(1).join(':'):p.slice(2).join(':')+' ('+p[1]+')'};
+  return keys.map(k=>'<div class="dv-li dv-li3"><span class="dv-pn">'+esc(C.t[k]||nm(k))+'<small> · '+esc(nm(k))+(C.h[k]?' · disembunyikan':'')+(C.r[k]?' · tersembunyi untuk '+C.r[k].join(', '):'')+'</small></span><span></span><button class="dv-ib" data-dv="ds-del" data-id="'+esc(k)+'" aria-label="Kembalikan">✕</button></div>').join('');
 }
 /* ---- Bilah Developer: Format cetak ---- */
 function ckDraft(doc){const d=S.dev.draft;if(!d.cetak||typeof d.cetak!=='object')d.cetak={};const K=cetakCfg(doc),c=d.cetak[doc]||(d.cetak[doc]={});
@@ -4131,6 +4217,16 @@ function ckHTML(){
    +'<button class="btn sm ghost" data-dv="ck-reset" data-id="'+doc+'">Kembalikan '+CETAK_DOC[doc]+' ke bawaan</button>';
 }
 SRT['dv-cblk']=ids=>{if(!S.dev)return;const c=ckDraft(S.dev.ck);c.blok=srtApply(c.blok,ids);devLive()};
+function dsBarHTML(){
+  return '<label class="dv-sw"><input type="checkbox" data-dvc="ds-mode"'+(S.dev.ds?' checked':'')+'><span><b>Mode desain</b><small>Ketuk tombol, judul kartu, atau label di layar untuk mengubah teks, menyembunyikan, atau menyembunyikan per peran. Pindah halaman lewat menu seperti biasa.</small></span></label>'
+   +'<div class="lbl" style="margin-top:8px">Perubahan</div>'+dsListHTML()
+   +'<p class="dv-help">Tombol penting (Bayar, login, tutup jendela, Simpan form, menu navigasi) tidak bisa diubah agar operasional aman. Navigasi diatur di bagian Navigasi.</p>'
+   +'<button class="btn sm ghost" data-dv="ds-all">Kembalikan semua desain</button>';
+}
+function alurHTML(){const a=S.dev.draft.alur||(S.dev.draft.alur={});
+  return ALUR.map(([k,l,h])=>'<label class="dv-sw"><input type="checkbox" data-dvc="alur" data-id="'+k+'"'+(a[k]!==false?' checked':'')+'><span><b>'+esc(l)+'</b>'+(h?'<small>'+esc(h)+'</small>':'')+'</span></label>').join('')
+   +'<p class="dv-help">Alur lain diatur di tempatnya: blokir jual saat stok habis (Pengaturan → Pajak, layanan, poin, stok), laporan grup WA, Google Sheets, sinkron, dan harga penerimaan (hak akses user).</p>';
+}
 function devLive(){cfgApply();render();devRender()}
 SRT['dv-nav']=(ids,c)=>{if(!S.dev)return;const pid=c.dataset.pid,d=S.dev.draft;if(pid){const f=devFind(pid);if(f&&Array.isArray(f.x.anak))f.x.anak=srtApply(f.x.anak,ids)}else d.menu=srtApply(d.menu,ids);devLive()};
 SRT['dv-mt']=ids=>{if(!S.dev)return;S.dev.draft.menuBahan.tab=srtApply(S.dev.draft.menuBahan.tab,ids);devLive()};
@@ -4155,6 +4251,9 @@ function devClick(el){
   if(a==='add-grup'){const g={id:'g-'+uid().slice(0,8).replace(/[^\w]/g,''),jenis:'grup',label:'Grup baru',tampil:true,kasir:true,anak:[]};const si=d.menu.findIndex(x=>x.id==='settings');d.menu.splice(si>=0?si:d.menu.length,0,g);devLive();setTimeout(()=>{const i=$('#devbar [data-dvc="lbl"][data-id="'+g.id+'"]');if(i){i.focus();i.select()}},50);return}
   if(a==='add-link'){const l={id:'ln-'+uid().slice(0,8).replace(/[^\w]/g,''),jenis:'tautan',label:'Tautan baru',url:'https://',tampil:true,kasir:true};const si=d.menu.findIndex(x=>x.id==='settings');d.menu.splice(si>=0?si:d.menu.length,0,l);devRender();toast('Isi nama & alamat tautan');return}
   if(a==='ck-doc'){S.dev.ck=id;devRender();return}
+  if(a==='ds-del'){const C=d.desain||{};['t','h','r'].forEach(x=>{if(C[x])delete C[x][id]});devLive();return}
+  if(a==='ds-off'){S.dev.ds=false;document.body.classList.remove('ds-on');dsClose();devLive();return}
+  if(a==='ds-all'){d.desain={t:{},h:{},r:{}};devLive();toast('Semua desain dikembalikan');return}
   if(a==='ck-reset'){if(d.cetak)delete d.cetak[id];devLive();toast(CETAK_DOC[id]+' kembali ke bawaan');return}
   if(a==='cart'){d.kasir.keranjang=id;devLive();return}
   if(a==='card'){d.kasir.ukuranKartu=id;devLive();return}
@@ -4181,6 +4280,8 @@ function devChange(el){
     else{if(pg==='inventory'&&(id==='cek'||id==='log')&&!el.checked&&!L.some(y=>y!==x&&(y.id==='cek'||y.id==='log')&&y.tampil!==false)){el.checked=true;toast('Minimal satu tab Inventory harus tampil');return}x.tampil=el.checked}}
   else if(a==='mt-on'){const L=d.menuBahan.tab,x=L.find(y=>y.id===id);if(!el.checked&&L.filter(y=>y.tampil!==false).length<2){el.checked=true;toast('Minimal satu tab harus tampil');return}x.tampil=el.checked}
   else if(a==='mt-lbl'){const x=d.menuBahan.tab.find(y=>y.id===id);x.label=el.value.trim().slice(0,24)}
+  else if(a==='ds-mode'){S.dev.ds=el.checked;document.body.classList.toggle('ds-on',el.checked);if(!el.checked)dsClose();devLive();toast(el.checked?'Mode desain: ketuk elemen di layar':'Mode desain mati');return}
+  else if(a==='alur'){(d.alur||(d.alur={}))[id]=el.checked}
   else if(/^ck-/.test(a)){const c=ckDraft(S.dev.ck);
     if(a==='ck-blk'){const x=c.blok.find(y=>y.id===id);if(x)x.on=el.checked}
     else if(a==='ck-f')c.f[id]=el.checked;
