@@ -1,6 +1,6 @@
 /* Service worker Soan Kofe POS: aplikasi tetap terbuka tanpa internet.
    Naikkan nomor VERSI saat Anda mengunggah versi baru agar cache lama dibersihkan. */
-const VERSI = 'soankofe-v50';
+const VERSI = 'soankofe-v51';
 const INTI = ['./', 'index.html', 'manifest.webmanifest', 'icons/icon-192.png', 'icons/icon-512.png', 'icons/icon-maskable-512.png', 'icons/apple-touch-icon.png'];
 
 self.addEventListener('install', e => {
