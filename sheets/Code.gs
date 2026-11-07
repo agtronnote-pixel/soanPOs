@@ -1,28 +1,33 @@
-/* Soan Kofe POS ⇄ Google Sheets (versi 2: laporan, input inventory, sinkron antar perangkat)
+/* Soan Kofe POS ⇄ Google Sheets (versi 3: laporan, input inventory, sinkron antar perangkat, Asisten AI)
    Cara pasang: buka Google Sheet → Ekstensi → Apps Script → hapus isi Code.gs → tempel kode ini
    → Simpan → Terapkan (Deploy) → Deployment baru → Jenis: Aplikasi web
    → Jalankan sebagai: Saya · Yang memiliki akses: Siapa saja → Terapkan → salin URL aplikasi web ke POS.
    Kode rahasia di bawah HARUS sama dengan yang tertulis di POS (Pengaturan → Google Sheets).
    Memperbarui kode: tempel kode baru → Simpan → Terapkan → Kelola deployment → Edit (pensil)
    → Versi: Versi baru → Terapkan (URL tetap sama).
-   Tab tersembunyi "_sinkron" berisi data toko untuk sinkron antar perangkat: JANGAN diedit / dihapus. */
+   Tab tersembunyi "_sinkron" berisi data toko untuk sinkron antar perangkat: JANGAN diedit / dihapus.
+   Asisten AI (foto struk): kunci API Claude disimpan di Properti Skrip (bukan di POS), diisi dari
+   POS → Pengaturan → Asisten AI. Saat pertama memperbarui ke versi 3, Google meminta izin
+   "terhubung ke layanan eksternal" — izinkan. */
 const KODE = '__KODE__';
 const TAB_INPUT = 'Input Inventory';
 const HEAD_INPUT = ['Tanggal', 'Nama bahan', 'Jenis', 'Jumlah', 'Satuan', 'Catatan', 'Oleh', 'Status'];
 const JENIS = ['Opname', 'Restock', 'Rusak', 'Bahan baru'];
 const TAB_SYNC = '_sinkron', POTONG = 45000; // batas isi 1 sel Google Sheets ±50.000 karakter
+const AI_URL = 'https://api.anthropic.com/v1/messages', AI_MODEL = ['claude-haiku-5-5', 'claude-sonnet-5-5'];
 
 function keluar(o) { return ContentService.createTextOutput(JSON.stringify(o)).setMimeType(ContentService.MimeType.JSON); }
-function doGet() { return keluar({ ok: true, app: 'soan-sheet', v: 2 }); }
+function doGet() { return keluar({ ok: true, app: 'soan-sheet', v: 3 }); }
 function doPost(e) {
   let q;
   try { q = JSON.parse(e.postData.contents); } catch (x) { return keluar({ ok: false, err: 'Permintaan tidak valid' }); }
   if (!q || q.kode !== KODE) return keluar({ ok: false, err: 'Kode rahasia salah' });
+  if (q.a === 'ai_kunci' || q.a === 'ai') { try { return keluar(q.a === 'ai' ? aiTanya(q.body) : aiKunci(q.key)); } catch (x) { return keluar({ ok: false, err: String((x && x.message) || x) }); } }
   const ss = SpreadsheetApp.getActiveSpreadsheet(), lock = LockService.getScriptLock();
   lock.waitLock(25000);
   try {
     siapkan(ss);
-    if (q.a === 'ping') return keluar({ ok: true, app: 'soan-sheet', v: 2, nama: ss.getName() });
+    if (q.a === 'ping') return keluar({ ok: true, app: 'soan-sheet', v: 3, nama: ss.getName(), ai: !!aiKey() });
     if (q.a === 'tulis') { Object.keys(q.tab || {}).forEach(n => tulisTab(ss, n, q.tab[n])); return keluar({ ok: true }); }
     if (q.a === 'ambil') return keluar({ ok: true, rows: ambil(ss, String(q.dev || 'POS')) });
     if (q.a === 'hasil') { hasil(ss, q.rows || []); return keluar({ ok: true }); }
@@ -111,4 +116,24 @@ function syncTulis(ss, ops) {
   if (rows.length) { const w = Math.max.apply(null, rows.map(r => r.length)); sh.getRange(sh.getLastRow() + 1, 1, rows.length, w).setValues(rows.map(r => r.concat(new Array(w - r.length).fill('')))); }
   pr.setProperty('clock', String(clock));
   return { n: rows.length, u: clock };
+}
+
+/* ---------- Asisten AI: meneruskan permintaan POS ke Claude API (kunci tidak pernah dikirim balik) ---------- */
+function aiKey() { return PropertiesService.getScriptProperties().getProperty('AI_KEY') || ''; }
+function aiKunci(key) {
+  const p = PropertiesService.getScriptProperties(), k = String(key || '').trim();
+  if (!k) { p.deleteProperty('AI_KEY'); return { ok: true, ai: false }; }
+  if (!/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k)) return { ok: false, err: 'Kunci API tidak valid (diawali sk-ant-)' };
+  p.setProperty('AI_KEY', k); return { ok: true, ai: true };
+}
+function aiTanya(body) {
+  const key = aiKey();
+  if (!key) return { ok: false, err: 'Kunci API AI belum diisi (POS → Pengaturan → Asisten AI)' };
+  if (!body || AI_MODEL.indexOf(body.model) < 0 || !Array.isArray(body.messages)) return { ok: false, err: 'Permintaan AI tidak valid' };
+  body.max_tokens = Math.min(+body.max_tokens || 2000, 4000);
+  const r = UrlFetchApp.fetch(AI_URL, { method: 'post', contentType: 'application/json', muteHttpExceptions: true,
+    headers: { 'x-api-key': key, 'anthropic-version': '2023-06-01' }, payload: JSON.stringify(body) });
+  let j = null; try { j = JSON.parse(r.getContentText()); } catch (x) {}
+  if (r.getResponseCode() !== 200) return { ok: false, err: 'AI menjawab ' + r.getResponseCode() + ((j && j.error && j.error.message) ? ': ' + j.error.message : '') };
+  return { ok: true, res: j };
 }

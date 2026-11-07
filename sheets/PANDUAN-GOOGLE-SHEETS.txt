@@ -90,3 +90,25 @@ D. SINKRON ANTAR PERANGKAT LEWAT SHEET
 
 Data sinkron tersimpan di tab tersembunyi "_sinkron". JANGAN diedit, diurutkan, atau dihapus.
 Laporan & input tetap diproses oleh satu "perangkat yang memproses" saja.
+
+
+E. ASISTEN AI: FOTO STRUK BELANJA
+---------------------------------
+Staf memotret struk / nota belanja → AI (Claude) membaca barang, jumlah, harga → staf memeriksa,
+mencocokkan dengan bahan di POS, lalu "Setujui & simpan" → stok bertambah.
+  - Owner / Finance: bisa langsung isi cara bayar (tunai → jurnal kas, transfer, invoice).
+  - Staf gudang (tanpa akses harga): stok bertambah, harga dari struk dikirim ke
+    Keuangan → "Penerimaan belum dihargai" (kolom harga sudah terisi, tinggal diperiksa).
+
+Pemasangan (Owner, sekali):
+1. Perbarui kode Apps Script ke versi 3 (cara di bagian D langkah 1). Saat menerapkan, Google
+   meminta izin baru "terhubung ke layanan eksternal" → Izinkan.
+2. Buat kunci API di Claude Console (platform.claude.com) → API keys → Create key.
+   Isi saldo di menu Billing (biaya ditagih ke akun Owner).
+3. POS → Pengaturan → Asisten AI → tempel kunci → "Simpan kunci" → "Tes AI".
+   Kunci disimpan di Apps Script (Properti Skrip), TIDAK di POS / HP staf.
+4. Tombol "Foto struk (AI)" muncul di Inventory dan Menu & Bahan.
+
+Biaya perkiraan per foto: Hemat (Claude Haiku 5.5) ±Rp20, Teliti (Claude Sonnet 5.5) ±Rp300.
+Foto diperkecil otomatis sebelum dikirim. Foto dikirim ke Anthropic untuk dibaca.
+AI bisa salah baca: selalu periksa jumlah & harga sebelum menyetujui.

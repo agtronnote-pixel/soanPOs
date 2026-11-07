@@ -22,6 +22,8 @@ semua teks aplikasi, pesan commit, komentar Issue/PR ditulis dalam **bahasa Indo
 - Jangan ubah format catatan sinkron `{k, j, del, u, dev}` atau API server (`/api/items`, `/api/stream`, `/api/files`, `/api/backup.zip`) tanpa tetap kompatibel dengan versi lama.
 - Jangan menambah layanan pihak ketiga (Firebase, analytics, CDN baru) kecuali diminta jelas di Issue.
   Pengecualian yang sudah disetujui pemilik (3 Nov 2026): Google Sheets lewat Google Apps Script milik toko.
+  (7 Nov 2026): Asisten AI foto struk lewat Claude API — kunci API hanya di Apps Script (Properti Skrip) atau
+  Server Lokal (`data/kunci-ai.txt` / `ANTHROPIC_API_KEY`), tidak pernah di POS / data sinkron.
 
 ## Cara kerja
 - Ikuti gaya kode yang ada (fungsi kecil, `ACT[...]` untuk aksi tombol, `VIEWS[...]` untuk halaman, `esc()` untuk teks pengguna).

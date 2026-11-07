@@ -7,7 +7,7 @@
 'use strict';
 const http = require('http'), fs = require('fs'), path = require('path'), os = require('os'), url = require('url'), zlib = require('zlib');
 
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 const PORT = +process.env.PORT || 8080;
 const HERE = __dirname;
 const APP_DIR = [path.join(HERE, 'app'), path.join(HERE, '..')].find(d => fs.existsSync(path.join(d, 'index.html')));
@@ -23,6 +23,12 @@ const FOLDERS = ['gambar', 'laporan', 'dokumen'];
    Bila kosong, server mencari folder Google Drive for desktop secara otomatis. */
 let CFG = {};
 try { CFG = JSON.parse(fs.readFileSync(path.join(HERE, 'pengaturan.json'), 'utf8')); } catch (e) {}
+
+/* ---------- Asisten AI (foto struk): kunci API Claude di server, tidak pernah dikirim ke perangkat ----------
+   Urutan: variabel lingkungan ANTHROPIC_API_KEY → "kunciAI" di pengaturan.json → data/kunci-ai.txt (diisi dari POS). */
+const AI_URL = process.env.SOAN_AI_URL || 'https://api.anthropic.com/v1/messages', AI_MODEL = ['claude-haiku-5-5', 'claude-sonnet-5-5'];
+const AI_FILE = path.join(DATA_DIR, 'kunci-ai.txt');
+function aiKey() { if (process.env.ANTHROPIC_API_KEY) return process.env.ANTHROPIC_API_KEY.trim(); if (CFG.kunciAI) return String(CFG.kunciAI).trim(); try { return fs.readFileSync(AI_FILE, 'utf8').trim(); } catch (e) { return ''; } }
 
 /* ---------- penyimpanan data ---------- */
 let store = { code: null, clock: 0, items: {} };
@@ -252,7 +258,7 @@ function listFiles() {
 const server = http.createServer(async (req, res) => {
   const u = url.parse(req.url, true), p = decodeURIComponent(u.pathname), q = u.query;
   try {
-    if (p === '/api/info') return send(res, 200, { name: 'soan-server', version: VERSION, hasData: !!store.code, items: Object.keys(store.items).length, app: { auto: UPD.on, last: UPD.last, lastUpdate: UPD.lastUpdate, files: UPD.files, err: UPD.err }, drive: { on: !!drive.root && !drive.err, last: drive.last, err: drive.err, files: drive.files, folder: drive.root ? path.basename(path.dirname(drive.root)) + '/SoanKofe-Cadangan' : null } });
+    if (p === '/api/info') return send(res, 200, { name: 'soan-server', version: VERSION, hasData: !!store.code, ai: !!aiKey(), items: Object.keys(store.items).length, app: { auto: UPD.on, last: UPD.last, lastUpdate: UPD.lastUpdate, files: UPD.files, err: UPD.err }, drive: { on: !!drive.root && !drive.err, last: drive.last, err: drive.err, files: drive.files, folder: drive.root ? path.basename(path.dirname(drive.root)) + '/SoanKofe-Cadangan' : null } });
 
     if (p.startsWith('/api/')) {
       const auth = checkCode(req, q);
@@ -305,6 +311,23 @@ const server = http.createServer(async (req, res) => {
         const z = backupZip(), d = new Date(), nm = 'SoanKofe-cadangan-' + dayOf(d) + '-' + pad(d.getHours()) + pad(d.getMinutes()) + '.zip';
         res.writeHead(200, { 'content-type': 'application/zip', 'content-length': z.length, 'content-disposition': 'attachment; filename="' + nm + '"', 'cache-control': 'no-store' });
         return res.end(z);
+      }
+      if (p === '/api/ai/key' && req.method === 'POST') {
+        const k = String((JSON.parse((await readBody(req, 4096)).toString('utf8')) || {}).key || '').trim();
+        if (!k) { try { fs.unlinkSync(AI_FILE); } catch (e) {} return send(res, 200, { ok: true, ai: !!aiKey() }); }
+        if (!/^sk-ant-[A-Za-z0-9_-]{20,}$/.test(k)) return send(res, 400, { error: 'Kunci API tidak valid (diawali sk-ant-)' });
+        fs.writeFileSync(AI_FILE, k, { mode: 0o600 }); return send(res, 200, { ok: true, ai: true });
+      }
+      if (p === '/api/ai' && req.method === 'POST') {
+        const key = aiKey(); if (!key) return send(res, 400, { error: 'Kunci API AI belum diisi (POS → Pengaturan → Asisten AI)' });
+        const body = JSON.parse((await readBody(req, 15e6)).toString('utf8'));
+        if (!body || !AI_MODEL.includes(body.model) || !Array.isArray(body.messages)) return send(res, 400, { error: 'Permintaan AI tidak valid' });
+        body.max_tokens = Math.min(+body.max_tokens || 2000, 4000);
+        let r; try { r = await fetch(AI_URL, { method: 'POST', headers: { 'content-type': 'application/json', 'x-api-key': key, 'anthropic-version': '2023-06-01' }, body: JSON.stringify(body) }); }
+        catch (e) { return send(res, 502, { error: 'Server tidak bisa menghubungi AI (cek internet server)' }); }
+        let j = null; try { j = await r.json(); } catch (e) {}
+        if (!r.ok) return send(res, 502, { error: 'AI menjawab ' + r.status + (j && j.error && j.error.message ? ': ' + j.error.message : '') });
+        return send(res, 200, { ok: true, res: j });
       }
       if (p === '/api/drive/now' && req.method === 'POST') { driveBackup(); return send(res, 200, { ok: !drive.err, err: drive.err }); }
       if (p === '/api/reports/rebuild' && req.method === 'POST') { rebuildAllCsv(); return send(res, 200, { ok: true }); }

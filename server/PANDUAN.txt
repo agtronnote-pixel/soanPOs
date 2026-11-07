@@ -103,6 +103,12 @@ versi sebelumnya disimpan di data/app-sebelumnya. Data toko tidak tersentuh.
 Untuk mematikan, buat/ubah pengaturan.json:  { "updateDariGithub": false }
 
 
+I. ASISTEN AI (FOTO STRUK)
+Bila POS memakai Server Lokal (tanpa Google Sheets), kunci API Claude disimpan di server:
+POS → Pengaturan → Asisten AI → tempel kunci → Simpan kunci (tersimpan di data/kunci-ai.txt),
+atau jalankan server dengan ANTHROPIC_API_KEY=sk-ant-... node server.js.
+Komputer server perlu internet saat foto struk dibaca.
+
 G. MASALAH UMUM
 ---------------
 - Perangkat tidak bisa membuka alamat server:
